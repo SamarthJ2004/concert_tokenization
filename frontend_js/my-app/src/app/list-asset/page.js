@@ -1,47 +1,73 @@
 "use client";
 
-import type React from "react";
-
 import { useState } from "react";
-import { Navigation } from "@/components/navigation";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Upload,
-  FileText,
-  CheckCircle,
-  Loader2,
-  ArrowLeft,
-} from "lucide-react";
 import Link from "next/link";
-import { useToast } from "@/hooks/use-toast";
+import { Navigation } from "@/components/navigation";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 import { ethers } from "ethers";
 
-// Extend Window interface to include ethereum
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
+// ---- Minimal toast system (Tailwind-only) ----
+function useMiniToast() {
+  const [toasts, setToasts] = useState([]);
+  const add = ({
+    title,
+    description,
+    variant = "default",
+    duration = 6000,
+  }) => {
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : String(Date.now() + Math.random());
+    setToasts((t) => [...t, { id, title, description, variant }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), duration);
+  };
+  const remove = (id) => setToasts((t) => t.filter((x) => x.id !== id));
+  return { toasts, add, remove };
+}
+
+function ToastViewport({ toasts, remove }) {
+  return (
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`min-w-64 max-w-sm rounded-md border p-3 shadow-md bg-white ${
+            t.variant === "destructive" ? "border-red-300" : "border-gray-200"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <div
+                className={`text-sm font-semibold ${
+                  t.variant === "destructive" ? "text-red-700" : "text-gray-900"
+                }`}
+              >
+                {t.title}
+              </div>
+              {t.description ? (
+                <div className="text-sm text-gray-600">{t.description}</div>
+              ) : null}
+            </div>
+            <button
+              className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-gray-100"
+              onClick={() => remove(t.id)}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // --- Minimal ABI for ProjectFactory.createProject(...) ---
 const PROJECT_FACTORY_ABI = [
   {
     inputs: [
-      {
-        internalType: "address",
-        name: "_insurancePool",
-        type: "address",
-      },
+      { internalType: "address", name: "_insurancePool", type: "address" },
     ],
     stateMutability: "nonpayable",
     type: "constructor",
@@ -66,96 +92,38 @@ const PROJECT_FACTORY_ABI = [
     type: "event",
   },
   {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
+    inputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     name: "allProjects",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
+    outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [
-      {
-        internalType: "string",
-        name: "name",
-        type: "string",
-      },
-      {
-        internalType: "string",
-        name: "symbol",
-        type: "string",
-      },
-      {
-        internalType: "uint256",
-        name: "area",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "req_amount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "exp_return_amount",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "min_threshold",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "timeout",
-        type: "uint256",
-      },
+      { internalType: "string", name: "name", type: "string" },
+      { internalType: "string", name: "symbol", type: "string" },
+      { internalType: "uint256", name: "area", type: "uint256" },
+      { internalType: "uint256", name: "req_amount", type: "uint256" },
+      { internalType: "uint256", name: "exp_return_amount", type: "uint256" },
+      { internalType: "uint256", name: "min_threshold", type: "uint256" },
+      { internalType: "uint256", name: "timeout", type: "uint256" },
     ],
     name: "createProject",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
+    outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
     inputs: [],
     name: "getAllProjects",
-    outputs: [
-      {
-        internalType: "address[]",
-        name: "",
-        type: "address[]",
-      },
-    ],
+    outputs: [{ internalType: "address[]", name: "", type: "address[]" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [],
     name: "insurancePool",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
+    outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
   },
@@ -163,9 +131,25 @@ const PROJECT_FACTORY_ABI = [
 
 const PROJECT_FACTORY_ADDRESS = "0x98B03aeF4d8BF183D5805f48AF6beF5cd571571C";
 
+// ---- Tailwind “variants” (mimic shadcn look) ----
+const btnBase =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+const btn = `${btnBase} bg-primary text-primary-foreground hover:opacity-90 px-4 py-2`;
+const btnLg = `${btn} text-base py-3`;
+const card =
+  "rounded-lg border border-border bg-card text-card-foreground shadow-sm";
+const cardHeader = "p-6";
+const cardTitle = "text-lg font-semibold leading-none tracking-tight";
+const cardDescription = "text-sm text-muted-foreground mt-1";
+const cardContent = "p-6 pt-0";
+const input =
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2";
+const textarea =
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2";
+
 export default function ListAssetPage() {
   const [isVerifying, setIsVerifying] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedFile, setUploadedFile] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     tokenSymbol: "",
@@ -178,16 +162,15 @@ export default function ListAssetPage() {
     timeoutDays: "",
     description: "",
   });
-  const { toast } = useToast();
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const { toasts, add: toast, remove } = useMiniToast();
+
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) setUploadedFile(file);
   };
@@ -203,7 +186,7 @@ export default function ListAssetPage() {
       "description",
     ];
     const missingFields = requiredFields.filter(
-      (field) => !formData[field as keyof typeof formData].trim()
+      (field) => !String(formData[field] || "").trim()
     );
 
     if (missingFields.length > 0) {
@@ -215,7 +198,6 @@ export default function ListAssetPage() {
       return false;
     }
 
-    // Validate numeric fields
     if (isNaN(Number(formData.area)) || Number(formData.area) <= 0) {
       toast({
         title: "Invalid Area",
@@ -252,52 +234,36 @@ export default function ListAssetPage() {
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log("Form submitted"); // Debug log
-
     // Validate form first
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       setIsVerifying(true);
 
-      // Check if wallet is available
+      // Check wallet
       if (typeof window === "undefined" || !window.ethereum) {
         throw new Error("No Ethereum wallet found. Please install MetaMask.");
       }
 
-      console.log("Connecting to wallet..."); // Debug log
-
-      // Request wallet connection
+      // Request connection
       const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
-
       if (!accounts || accounts.length === 0) {
         throw new Error("No accounts found. Please connect your wallet.");
       }
 
-      console.log("Wallet connected:", accounts[0]); // Debug log
-
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      console.log("Preparing transaction parameters..."); // Debug log
-
-      // Prepare transaction parameters with better error handling
+      // Prepare params
       const name = formData.name.trim();
       const symbol = formData.tokenSymbol.trim().toUpperCase();
 
-      let area: bigint;
-      let req_amount: bigint;
-      let exp_return_amount: bigint;
-      let min_threshold: bigint;
-      let timeout: bigint;
-
+      let area, req_amount, exp_return_amount, min_threshold, timeout;
       try {
         area = BigInt(formData.area);
         req_amount = ethers.parseEther(formData.amountToRaise);
@@ -308,30 +274,16 @@ export default function ListAssetPage() {
           ? ethers.parseEther(formData.minThreshold)
           : BigInt(0);
         timeout = BigInt(Math.floor(Number(formData.timeoutDays) * 86400));
-      } catch (parseError) {
+      } catch {
         throw new Error("Invalid numeric values. Please check your inputs.");
       }
 
-      console.log("Transaction parameters:", {
-        name,
-        symbol,
-        area: area.toString(),
-        req_amount: req_amount.toString(),
-        exp_return_amount: exp_return_amount.toString(),
-        min_threshold: min_threshold.toString(),
-        timeout: timeout.toString(),
-      });
-
-      // Create contract instance
+      // Contract
       const factory = new ethers.Contract(
         PROJECT_FACTORY_ADDRESS,
         PROJECT_FACTORY_ABI,
         signer
       );
-
-      console.log("Calling createProject..."); // Debug log
-
-      // Call the contract function
       const tx = await factory.createProject(
         name,
         symbol,
@@ -342,33 +294,23 @@ export default function ListAssetPage() {
         timeout
       );
 
-      console.log("Transaction sent:", tx.hash);
-
       toast({
         title: "Transaction Sent",
         description: `Hash: ${tx.hash.slice(0, 10)}…`,
       });
 
-      console.log("Waiting for transaction confirmation..."); // Debug log
-
       const receipt = await tx.wait();
 
-      console.log("Transaction confirmed:", receipt);
-
-      // Try to extract the created project address from events
-      let createdAddress: string | undefined;
+      // Extract ProjectCreated event (best-effort)
+      let createdAddress;
       try {
-        const projectCreatedTopic = ethers.id(
-          "ProjectCreated(address,address)"
-        );
-        const log = receipt.logs.find(
-          (log: any) => log.topics && log.topics[0] === projectCreatedTopic
-        );
+        const topic = ethers.id("ProjectCreated(address,address)");
+        const log = receipt.logs.find((l) => l.topics && l.topics[0] === topic);
         if (log && log.topics.length > 1) {
           createdAddress = ethers.getAddress("0x" + log.topics[1].slice(26));
         }
-      } catch (eventError) {
-        console.warn("Could not parse ProjectCreated event:", eventError);
+      } catch {
+        // no-op
       }
 
       toast({
@@ -393,20 +335,16 @@ export default function ListAssetPage() {
         description: "",
       });
       setUploadedFile(null);
-    } catch (error: any) {
-      console.error("Error creating project:", error);
-
+    } catch (error) {
       let errorMessage = "An unexpected error occurred.";
-
-      if (error.code === 4001) {
-        errorMessage = "Transaction was rejected by user.";
-      } else if (error.code === -32603) {
-        errorMessage =
-          "Internal JSON-RPC error. Please check your network connection.";
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (error && typeof error === "object") {
+        if (error.code === 4001)
+          errorMessage = "Transaction was rejected by user.";
+        else if (error.code === -32603)
+          errorMessage =
+            "Internal JSON-RPC error. Please check your network connection.";
+        else if (error.message) errorMessage = error.message;
       }
-
       toast({
         title: "Failed to Create Project",
         description: errorMessage,
@@ -421,6 +359,7 @@ export default function ListAssetPage() {
   return (
     <main className="min-h-screen bg-background">
       <Navigation />
+      <ToastViewport toasts={toasts} remove={remove} />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="max-w-2xl mx-auto">
@@ -441,38 +380,50 @@ export default function ListAssetPage() {
           </div>
 
           {/* Form Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Asset Information</CardTitle>
-              <CardDescription>
+          <div className={card}>
+            <div className={cardHeader}>
+              <div className={cardTitle}>Asset Information</div>
+              <div className={cardDescription}>
                 Provide details about your asset to create tokenized investment
                 opportunities.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </div>
+            </div>
+            <div className={cardContent}>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Asset Name *</Label>
-                    <Input
+                    <label
+                      htmlFor="name"
+                      className="text-sm font-medium leading-none"
+                    >
+                      Asset Name *
+                    </label>
+                    <input
                       id="name"
                       name="name"
                       placeholder="e.g., Downtown Commercial Property"
                       value={formData.name}
                       onChange={handleInputChange}
+                      className={input}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="tokenSymbol">Token Symbol *</Label>
-                    <Input
+                    <label
+                      htmlFor="tokenSymbol"
+                      className="text-sm font-medium leading-none"
+                    >
+                      Token Symbol *
+                    </label>
+                    <input
                       id="tokenSymbol"
                       name="tokenSymbol"
                       placeholder="e.g., DCP"
                       value={formData.tokenSymbol}
                       onChange={handleInputChange}
                       maxLength={6}
+                      className={input}
                       required
                     />
                   </div>
@@ -481,19 +432,30 @@ export default function ListAssetPage() {
                 {/* Location and Area */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="location">Location *</Label>
-                    <Input
+                    <label
+                      htmlFor="location"
+                      className="text-sm font-medium leading-none"
+                    >
+                      Location *
+                    </label>
+                    <input
                       id="location"
                       name="location"
                       placeholder="e.g., New York, NY"
                       value={formData.location}
                       onChange={handleInputChange}
+                      className={input}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="area">Total Tokens *</Label>
-                    <Input
+                    <label
+                      htmlFor="area"
+                      className="text-sm font-medium leading-none"
+                    >
+                      Total Tokens *
+                    </label>
+                    <input
                       id="area"
                       name="area"
                       type="number"
@@ -501,6 +463,7 @@ export default function ListAssetPage() {
                       value={formData.area}
                       onChange={handleInputChange}
                       min="1"
+                      className={input}
                       required
                     />
                   </div>
@@ -509,10 +472,13 @@ export default function ListAssetPage() {
                 {/* Financial Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="amountToRaise">
+                    <label
+                      htmlFor="amountToRaise"
+                      className="text-sm font-medium leading-none"
+                    >
                       Amount to Raise (ETH) *
-                    </Label>
-                    <Input
+                    </label>
+                    <input
                       id="amountToRaise"
                       name="amountToRaise"
                       type="number"
@@ -521,12 +487,18 @@ export default function ListAssetPage() {
                       value={formData.amountToRaise}
                       onChange={handleInputChange}
                       min="0"
+                      className={input}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="expReturn">Expected Return (ETH)</Label>
-                    <Input
+                    <label
+                      htmlFor="expReturn"
+                      className="text-sm font-medium leading-none"
+                    >
+                      Expected Return (ETH)
+                    </label>
+                    <input
                       id="expReturn"
                       name="expReturn"
                       type="number"
@@ -535,16 +507,20 @@ export default function ListAssetPage() {
                       value={formData.expReturn}
                       onChange={handleInputChange}
                       min="0"
+                      className={input}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="minThreshold">
+                    <label
+                      htmlFor="minThreshold"
+                      className="text-sm font-medium leading-none"
+                    >
                       Minimum Threshold (ETH)
-                    </Label>
-                    <Input
+                    </label>
+                    <input
                       id="minThreshold"
                       name="minThreshold"
                       type="number"
@@ -553,11 +529,17 @@ export default function ListAssetPage() {
                       value={formData.minThreshold}
                       onChange={handleInputChange}
                       min="0"
+                      className={input}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="timeoutDays">Timeout (days) *</Label>
-                    <Input
+                    <label
+                      htmlFor="timeoutDays"
+                      className="text-sm font-medium leading-none"
+                    >
+                      Timeout (days) *
+                    </label>
+                    <input
                       id="timeoutDays"
                       name="timeoutDays"
                       type="number"
@@ -565,6 +547,7 @@ export default function ListAssetPage() {
                       value={formData.timeoutDays}
                       onChange={handleInputChange}
                       min="1"
+                      className={input}
                       required
                     />
                   </div>
@@ -573,10 +556,13 @@ export default function ListAssetPage() {
                 {/* Optional Display Field */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="pricePerToken">
+                    <label
+                      htmlFor="pricePerToken"
+                      className="text-sm font-medium leading-none"
+                    >
                       Price per Token (display only)
-                    </Label>
-                    <Input
+                    </label>
+                    <input
                       id="pricePerToken"
                       name="pricePerToken"
                       type="number"
@@ -585,41 +571,44 @@ export default function ListAssetPage() {
                       value={formData.pricePerToken}
                       onChange={handleInputChange}
                       min="0"
+                      className={input}
                     />
                   </div>
                 </div>
 
                 {/* Description */}
                 <div className="space-y-2">
-                  <Label htmlFor="description">Asset Description *</Label>
-                  <Textarea
+                  <label
+                    htmlFor="description"
+                    className="text-sm font-medium leading-none"
+                  >
+                    Asset Description *
+                  </label>
+                  <textarea
                     id="description"
                     name="description"
                     placeholder="Describe your asset, its features, and investment potential..."
                     value={formData.description}
                     onChange={handleInputChange}
                     rows={4}
+                    className={textarea}
                     required
                   />
                 </div>
 
-                {/* File Upload Section */}
-                {/* <div className="space-y-2">
-                  <Label htmlFor="document-upload">
+                {/* File Upload (optional demo) */}
+                {/* 
+                <div className="space-y-2">
+                  <label htmlFor="document-upload" className="text-sm font-medium leading-none">
                     Verification Documents (Optional)
-                  </Label>
+                  </label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
                     <div className="text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <svg className="mx-auto h-12 w-12 text-gray-400" viewBox="0 0 24 24" fill="none"><path d="M..." /></svg>
                       <div className="mt-4">
-                        <label
-                          htmlFor="document-upload"
-                          className="cursor-pointer"
-                        >
+                        <label htmlFor="document-upload" className="cursor-pointer">
                           <span className="mt-2 block text-sm font-medium text-gray-900">
-                            {uploadedFile
-                              ? uploadedFile.name
-                              : "Click to upload or drag and drop"}
+                            {uploadedFile ? uploadedFile.name : "Click to upload or drag and drop"}
                           </span>
                           <span className="mt-1 block text-xs text-gray-500">
                             PDF, DOC, DOCX up to 10MB
@@ -636,13 +625,13 @@ export default function ListAssetPage() {
                       </div>
                     </div>
                   </div>
-                </div> */}
+                </div>
+                */}
 
                 {/* Submit Button */}
-                <Button
+                <button
                   type="submit"
-                  className="w-full"
-                  size="lg"
+                  className={`${btnLg} w-full`}
                   disabled={isVerifying}
                 >
                   {isVerifying ? (
@@ -653,7 +642,7 @@ export default function ListAssetPage() {
                   ) : (
                     "List Property"
                   )}
-                </Button>
+                </button>
 
                 {isVerifying && (
                   <div className="text-center text-sm text-muted-foreground">
@@ -661,8 +650,8 @@ export default function ListAssetPage() {
                   </div>
                 )}
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
     </main>

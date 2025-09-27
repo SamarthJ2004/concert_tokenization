@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Navigation } from "@/components/navigation";
 import {
   Card,
@@ -26,75 +28,681 @@ import {
   Wallet,
   Check,
 } from "lucide-react";
-import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { useParams } from "next/navigation";
 
-// Extended mock data with additional details
-const mockProperties = [
+// ---------- ethers v6 ----------
+import { BrowserProvider, Contract, formatEther, parseEther } from "ethers";
+
+// ---------------- CONFIG ----------------
+const FACTORY_ADDRESS = "0x98B03aeF4d8BF183D5805f48AF6beF5cd571571C"; // <-- put your ProjectFactory address here
+
+// Minimal ABIs (read-only)
+const FACTORY_ABI = [
   {
-    id: 1,
-    name: "Downtown Commercial Plaza",
-    symbol: "DCP",
-    location: "New York, NY",
-    area: 15000,
-    pricePerToken: 100,
-    totalTokens: 10000,
-    soldTokens: 7500,
-    amountRaised: 750000,
-    targetAmount: 1000000,
-    description:
-      "Prime commercial real estate in the heart of Manhattan with high-end retail tenants.",
-    image: "/modern-commercial-building.png",
-    apy: 8.5,
-    status: "active",
-    maturityTime: "24 months",
-    totalSale: 1000000,
-    ticketSale: 100,
-    totalInvestors: 75,
-    investors: [
-      { ens: "bob.eth", tokens: 250, investment: 25000 },
-      { ens: "alice.eth", tokens: 500, investment: 50000 },
-      { ens: "charlie.eth", tokens: 300, investment: 30000 },
-      { ens: "diana.eth", tokens: 150, investment: 15000 },
-      { ens: "eve.eth", tokens: 400, investment: 40000 },
-      { ens: "frank.eth", tokens: 200, investment: 20000 },
-      { ens: "grace.eth", tokens: 350, investment: 35000 },
-      { ens: "henry.eth", tokens: 180, investment: 18000 },
+    inputs: [
+      {
+        internalType: "address",
+        name: "_insurancePool",
+        type: "address",
+      },
     ],
-    propertyDetails: {
-      yearBuilt: 2018,
-      floors: 12,
-      tenants: 8,
-      occupancyRate: 95,
-      monthlyRent: 45000,
-      propertyType: "Commercial Office",
-    },
-    // NEW: allowlist workflow
-    waitlisted: ["satoshi.eth", "vitalik.eth", "naval.eth"],
-    allowed: [],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "address",
+        name: "project",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "promoter",
+        type: "address",
+      },
+    ],
+    name: "ProjectCreated",
+    type: "event",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "allProjects",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "name",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "symbol",
+        type: "string",
+      },
+      {
+        internalType: "uint256",
+        name: "area",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "req_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "exp_return_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "min_threshold",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "timeout",
+        type: "uint256",
+      },
+    ],
+    name: "createProject",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getAllProjects",
+    outputs: [
+      {
+        internalType: "address[]",
+        name: "",
+        type: "address[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "insurancePool",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
   },
 ];
 
+const PROJECT_ABI = [
+  {
+    inputs: [
+      {
+        internalType: "string",
+        name: "_name",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "_symbol",
+        type: "string",
+      },
+      {
+        internalType: "address",
+        name: "_promoter",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "_insurancePool",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "_area",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_req_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_exp_return_amount",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_min_threshold",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_timeout",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    inputs: [],
+    name: "INSURANCE_BP",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "area",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "closeFunding",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "lossAmount",
+        type: "uint256",
+      },
+    ],
+    name: "distributeLoss",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "revenue",
+        type: "uint256",
+      },
+    ],
+    name: "distributeProfit",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "exp_return_amount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "fundingClosed",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "insurancePool",
+    outputs: [
+      {
+        internalType: "contract InsurancePool",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "invest",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    name: "investorBalances",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "investors",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "min_threshold",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "promoter",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "req_amount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "revenueDistributed",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "shareToken",
+    outputs: [
+      {
+        internalType: "contract ComplianceToken",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "timeout",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalRaised",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+];
+
+const ERC20_MIN_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function totalSupply() view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+] as const;
+
+// ---------------- TYPES ----------------
+type ProjectUi = {
+  address: string;
+  promoter: string;
+  fundingClosed: boolean;
+  totalRaisedEth: number;
+  areaTokens: number; // equals token total supply in whole tokens (assuming minted 1:1 with area)
+  reqAmountEth: number; // fundraising target in ETH
+  expReturnEth: number; // from exp_return_amount (ETH)
+  minThresholdEth: number; // from min_threshold (ETH)
+  timeout: number; // raw uint
+  token: {
+    address: string;
+    name: string;
+    symbol: string;
+    decimals: number;
+    totalSupplyTokens: number;
+    promoterBalanceTokens: number;
+  };
+};
+
 export default function PropertyDetailPage() {
-  const params = useParams();
-  const propertyId = Number(params.id);
-  const property = mockProperties.find((p) => p.id === propertyId);
-  const [purchaseAmount, setPurchaseAmount] = useState("");
+  const params = useParams<{ id: string }>();
+  const routeId = String(params.id); // can be address or numeric index
   const { toast } = useToast();
 
-  // NEW: local state for waitlist/allowed
-  const [waitlisted, setWaitlisted] = useState<string[]>(
-    property?.waitlisted ?? []
-  );
-  const [allowed, setAllowed] = useState<string[]>(property?.allowed ?? []);
+  const [purchaseAmount, setPurchaseAmount] = useState(""); // tokens (whole)
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [proj, setProj] = useState<ProjectUi | null>(null);
 
-  if (!property) {
+  // local UI for allowlist demo (not on-chain)
+  const [waitlisted, setWaitlisted] = useState<string[]>([
+    "satoshi.eth",
+    "vitalik.eth",
+    "naval.eth",
+  ]);
+  const [allowed, setAllowed] = useState<string[]>([]);
+
+  // ---- helpers ----
+  const isAddressLike = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s);
+
+  // Resolve route param -> project address
+  async function resolveProjectAddress(
+    provider: BrowserProvider
+  ): Promise<string> {
+    if (isAddressLike(routeId)) return routeId;
+
+    // treat as index (1-based or 0-based). We'll accept either:
+    const idxRaw = Number(routeId);
+    if (Number.isFinite(idxRaw) && idxRaw >= 0) {
+      const factory = new Contract(FACTORY_ADDRESS, FACTORY_ABI, provider);
+      const all: string[] = await factory.getAllProjects();
+      // prefer 1-based if possible; else fallback to 0-based
+      if (idxRaw > 0 && idxRaw <= all.length) return all[idxRaw - 1];
+      if (idxRaw < all.length) return all[idxRaw];
+      throw new Error(
+        `Project index out of range. Found ${all.length} projects.`
+      );
+    }
+
+    throw new Error("Route param must be a project address (0x…) or an index.");
+  }
+
+  // Fetch from chain
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        if (!window?.ethereum) throw new Error("No wallet provider found.");
+
+        const provider = new BrowserProvider(window.ethereum);
+        try {
+          await provider.send("eth_requestAccounts", []);
+        } catch {}
+
+        const projectAddr = await resolveProjectAddress(provider);
+        const project = new Contract(projectAddr, PROJECT_ABI, provider);
+
+        const [
+          promoter,
+          fundingClosed,
+          totalRaisedBN,
+          areaBN,
+          reqAmountBN,
+          expReturnBN,
+          minThresholdBN,
+          timeout,
+          shareTokenAddr,
+        ] = await Promise.all([
+          project.promoter(),
+          project.fundingClosed(),
+          project.totalRaised(),
+          project.area(),
+          project.req_amount(),
+          project.exp_return_amount(),
+          project.min_threshold(),
+          project.timeout(),
+          project.shareToken(),
+        ]);
+
+        const token = new Contract(shareTokenAddr, ERC20_MIN_ABI, provider);
+        const [name, symbol, decimals, totalSupplyBN, promoterBalBN] =
+          await Promise.all([
+            token.name(),
+            token.symbol(),
+            token.decimals(),
+            token.totalSupply(),
+            token.balanceOf(promoter),
+          ]);
+
+        const base = 10 ** Number(decimals);
+        const totalSupplyTokens = Number(totalSupplyBN) / base;
+        const promoterBalanceTokens = Number(promoterBalBN) / base;
+
+        const ui: ProjectUi = {
+          address: projectAddr,
+          promoter,
+          fundingClosed,
+          totalRaisedEth: Number(formatEther(totalRaisedBN)),
+          areaTokens: Number(areaBN),
+          reqAmountEth: Number(formatEther(reqAmountBN)),
+          expReturnEth: Number(formatEther(expReturnBN)),
+          minThresholdEth: Number(formatEther(minThresholdBN)),
+          timeout: Number(timeout),
+          token: {
+            address: shareTokenAddr,
+            name,
+            symbol,
+            decimals: Number(decimals),
+            totalSupplyTokens,
+            promoterBalanceTokens,
+          },
+        };
+
+        setProj(ui);
+      } catch (e: any) {
+        console.error(e);
+        setErr(e?.message ?? "Failed to load project.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeId]);
+
+  // -------- derived UI values --------
+  const soldTokens = useMemo(() => {
+    if (!proj) return 0;
+    // tokens distributed out from promoter wallet (approx)
+    return Math.max(
+      0,
+      proj.token.totalSupplyTokens - proj.token.promoterBalanceTokens
+    );
+  }, [proj]);
+
+  const availableTokens = useMemo(() => {
+    if (!proj) return 0;
+    return Math.max(0, proj.token.totalSupplyTokens - soldTokens);
+  }, [proj, soldTokens]);
+
+  const pricePerTokenEth = useMemo(() => {
+    if (!proj) return 0;
+    // req_amount (ETH) divided by areaTokens (plain token units)
+    return proj.areaTokens > 0 ? proj.reqAmountEth / proj.areaTokens : 0;
+  }, [proj]);
+
+  const progressPct = useMemo(() => {
+    if (!proj) return 0;
+    return proj.reqAmountEth > 0
+      ? (proj.totalRaisedEth / proj.reqAmountEth) * 100
+      : 0;
+  }, [proj]);
+
+  const statusLabel = useMemo<"active" | "funded">(() => {
+    if (!proj) return "active";
+    return proj.fundingClosed || proj.totalRaisedEth >= proj.reqAmountEth
+      ? "funded"
+      : "active";
+  }, [proj]);
+
+  // ---------- actions ----------
+  const handleBuyTokens = () => {
+    if (!proj) return;
+    const qty = Number.parseInt(purchaseAmount);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Enter token quantity > 0",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (qty > availableTokens) {
+      toast({
+        title: "Insufficient Tokens",
+        description: `Only ${availableTokens} tokens estimated available.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    // NOTE: Actual purchase requires calling project.invest() with msg.value = qty * pricePerTokenEth
+    // and promoter must have approved tokens to the Project beforehand.
+    toast({
+      title: "Demo Only",
+      description: `Would invest ~${(qty * pricePerTokenEth).toFixed(
+        6
+      )} ETH into ${proj.token.symbol}. Wire up project.invest() to proceed.`,
+    });
+    setPurchaseAmount("");
+  };
+
+  const handleAllow = (ens: string) => {
+    setWaitlisted((prev) => prev.filter((e) => e !== ens));
+    setAllowed((prev) => [...prev, ens]);
+    toast({
+      title: "Address Allowed",
+      description: `${ens} can now buy/sell/transfer ${
+        proj?.token.symbol ?? "TOKEN"
+      }.`,
+    });
+  };
+
+  // ---------- rendering ----------
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-12">Loading project…</div>
+      </main>
+    );
+  }
+
+  if (err || !proj) {
     return (
       <main className="min-h-screen bg-background">
         <Navigation />
         <div className="container mx-auto px-4 py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Property Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4">Project Not Found</h1>
+          <p className="text-muted-foreground mb-6">
+            {err ?? "Try a different id/address."}
+          </p>
           <Link href="/browse-tokens">
             <Button>Back to Browse Tokens</Button>
           </Link>
@@ -102,51 +710,6 @@ export default function PropertyDetailPage() {
       </main>
     );
   }
-
-  const progressPercentage = (property.soldTokens / property.totalTokens) * 100;
-  const availableTokens = property.totalTokens - property.soldTokens;
-
-  const handleBuyTokens = () => {
-    if (!purchaseAmount) return;
-
-    const amount = Number.parseInt(purchaseAmount);
-    if (amount <= 0) {
-      toast({
-        title: "Invalid Amount",
-        description: "Please enter a valid number of tokens to purchase.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (amount > availableTokens) {
-      toast({
-        title: "Insufficient Tokens",
-        description: `Only ${availableTokens} tokens available for purchase.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: "Purchase Successful!",
-      description: `Successfully purchased ${amount} ${
-        property.symbol
-      } tokens for $${(amount * property.pricePerToken).toLocaleString()}.`,
-    });
-
-    setPurchaseAmount("");
-  };
-
-  // NEW: allow action – move ENS from waitlisted -> allowed
-  const handleAllow = (ens: string) => {
-    setWaitlisted((prev) => prev.filter((e) => e !== ens));
-    setAllowed((prev) => [...prev, ens]);
-    toast({
-      title: "Address Allowed",
-      description: `${ens} can now buy/sell/transfer ${property.symbol}.`,
-    });
-  };
 
   return (
     <main className="min-h-screen bg-background">
@@ -171,17 +734,15 @@ export default function PropertyDetailPage() {
             <Card>
               <div className="aspect-video relative overflow-hidden rounded-t-lg">
                 <img
-                  src={property.image || "/placeholder.svg"}
-                  alt={property.name}
+                  src={"/placeholder.svg"}
+                  alt={proj.token.name}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute top-4 right-4">
                   <Badge
-                    variant={
-                      property.status === "funded" ? "default" : "secondary"
-                    }
+                    variant={statusLabel === "funded" ? "default" : "secondary"}
                   >
-                    {property.status === "funded" ? "Fully Funded" : "Active"}
+                    {statusLabel === "funded" ? "Fully Funded" : "Active"}
                   </Badge>
                 </div>
               </div>
@@ -189,35 +750,47 @@ export default function PropertyDetailPage() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-2xl">{property.name}</CardTitle>
+                    <CardTitle className="text-2xl">
+                      {proj.token.name}
+                    </CardTitle>
                     <CardDescription className="flex items-center gap-1 mt-2 text-base">
                       <MapPin className="h-4 w-4" />
-                      {property.location}
+                      {/* No on-chain location; placeholder */}—
+                    </CardDescription>
+                    <CardDescription className="mt-2 text-xs break-all">
+                      Project: {proj.address}
+                    </CardDescription>
+                    <CardDescription className="text-xs break-all">
+                      Token: {proj.token.address}
+                    </CardDescription>
+                    <CardDescription className="text-xs break-all">
+                      Promoter: {proj.promoter}
                     </CardDescription>
                   </div>
                   <Badge
                     variant="outline"
                     className="font-mono text-lg px-3 py-1"
                   >
-                    {property.symbol}
+                    {proj.token.symbol}
                   </Badge>
                 </div>
                 <p className="text-muted-foreground mt-4">
-                  {property.description}
+                  On-chain project tokenized via ComplianceToken. Values below
+                  are live from the contracts.
                 </p>
               </CardHeader>
             </Card>
 
-            {/* Key Metrics */}
+            {/* Key Metrics (some items kept as placeholders where off-chain) */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-4 text-center">
                   <DollarSign className="h-8 w-8 mx-auto mb-2 text-accent" />
                   <div className="text-2xl font-bold">
-                    ${property.totalSale.toLocaleString()}
+                    {proj.reqAmountEth.toLocaleString()} ETH
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Total Sale
+                    Target Amount
                   </div>
                 </CardContent>
               </Card>
@@ -225,11 +798,9 @@ export default function PropertyDetailPage() {
               <Card>
                 <CardContent className="p-4 text-center">
                   <Clock className="h-8 w-8 mx-auto mb-2 text-accent" />
-                  <div className="text-2xl font-bold">
-                    {property.maturityTime}
-                  </div>
+                  <div className="text-2xl font-bold">{proj.timeout}</div>
                   <div className="text-sm text-muted-foreground">
-                    Maturity Time
+                    Timeout (raw)
                   </div>
                 </CardContent>
               </Card>
@@ -238,10 +809,10 @@ export default function PropertyDetailPage() {
                 <CardContent className="p-4 text-center">
                   <Target className="h-8 w-8 mx-auto mb-2 text-accent" />
                   <div className="text-2xl font-bold">
-                    ${property.ticketSale}
+                    {pricePerTokenEth.toFixed(6)} ETH
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Ticket Sale
+                    Price / Token
                   </div>
                 </CardContent>
               </Card>
@@ -249,11 +820,9 @@ export default function PropertyDetailPage() {
               <Card>
                 <CardContent className="p-4 text-center">
                   <Users className="h-8 w-8 mx-auto mb-2 text-accent" />
-                  <div className="text-2xl font-bold">
-                    {property.totalInvestors}
-                  </div>
+                  <div className="text-2xl font-bold">—</div>
                   <div className="text-sm text-muted-foreground">
-                    Total Investors
+                    Total Investors (add helper on-chain)
                   </div>
                 </CardContent>
               </Card>
@@ -279,15 +848,23 @@ export default function PropertyDetailPage() {
                           Price per Token
                         </div>
                         <div className="text-xl font-semibold">
-                          ${property.pricePerToken}
+                          {pricePerTokenEth.toFixed(6)} ETH
                         </div>
                       </div>
                       <div>
                         <div className="text-sm text-muted-foreground">
-                          Expected APY
+                          Expected Return (target)
                         </div>
-                        <div className="text-xl font-semibold text-accent">
-                          {property.apy}%
+                        <div className="text-xl font-semibold">
+                          {proj.expReturnEth.toLocaleString()} ETH
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">
+                          Min Threshold
+                        </div>
+                        <div className="text-xl font-semibold">
+                          {proj.minThresholdEth.toLocaleString()} ETH
                         </div>
                       </div>
                       <div>
@@ -295,7 +872,7 @@ export default function PropertyDetailPage() {
                           Total Tokens
                         </div>
                         <div className="text-xl font-semibold">
-                          {property.totalTokens.toLocaleString()}
+                          {proj.token.totalSupplyTokens.toLocaleString()}
                         </div>
                       </div>
                       <div>
@@ -303,7 +880,7 @@ export default function PropertyDetailPage() {
                           Sold Tokens
                         </div>
                         <div className="text-xl font-semibold">
-                          {property.soldTokens.toLocaleString()}
+                          {soldTokens.toLocaleString()}
                         </div>
                       </div>
                       <div>
@@ -314,14 +891,6 @@ export default function PropertyDetailPage() {
                           {availableTokens.toLocaleString()}
                         </div>
                       </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">
-                          Property Area
-                        </div>
-                        <div className="text-xl font-semibold">
-                          {property.area.toLocaleString()} sq ft
-                        </div>
-                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -330,16 +899,16 @@ export default function PropertyDetailPage() {
                           Funding Progress
                         </span>
                         <span className="font-medium">
-                          {progressPercentage.toFixed(1)}%
+                          {progressPct.toFixed(1)}%
                         </span>
                       </div>
-                      <Progress value={progressPercentage} className="h-3" />
+                      <Progress value={progressPct} className="h-3" />
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>
-                          ${property.amountRaised.toLocaleString()} raised
+                          {proj.totalRaisedEth.toLocaleString()} ETH raised
                         </span>
                         <span>
-                          ${property.targetAmount.toLocaleString()} target
+                          {proj.reqAmountEth.toLocaleString()} ETH target
                         </span>
                       </div>
                     </div>
@@ -350,45 +919,29 @@ export default function PropertyDetailPage() {
               <TabsContent value="investors" className="space-y-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Top Investors</CardTitle>
+                    <CardTitle>Holders Snapshot</CardTitle>
                     <CardDescription>
-                      Current token holders and their investments
+                      Full investor list requires a helper like{" "}
+                      <code>getInvestorCount()</code> and iterating on-chain.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {property.investors.map((investor, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-accent/20 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium">
-                                {investor.ens.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="font-medium">{investor.ens}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {investor.tokens} tokens
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold">
-                              ${investor.investment.toLocaleString()}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {(
-                                (investor.tokens / property.totalTokens) *
-                                100
-                              ).toFixed(2)}
-                              %
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <div className="text-sm text-muted-foreground">
+                        Promoter Holding
+                      </div>
+                      <div className="text-lg font-semibold">
+                        {proj.token.promoterBalanceTokens.toLocaleString()}{" "}
+                        tokens
+                      </div>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <div className="text-sm text-muted-foreground">
+                        Distributed (Sold)
+                      </div>
+                      <div className="text-lg font-semibold">
+                        {soldTokens.toLocaleString()} tokens
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -400,56 +953,27 @@ export default function PropertyDetailPage() {
                     <CardTitle>Property Information</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {/* On-chain contract doesn't store property metadata; placeholders shown */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
                         <div className="text-sm text-muted-foreground">
                           Property Type
                         </div>
+                        <div className="font-semibold">—</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">
+                          Area (tokens)
+                        </div>
                         <div className="font-semibold">
-                          {property.propertyDetails.propertyType}
+                          {proj.areaTokens.toLocaleString()}
                         </div>
                       </div>
                       <div>
                         <div className="text-sm text-muted-foreground">
-                          Year Built
+                          Occupancy
                         </div>
-                        <div className="font-semibold">
-                          {property.propertyDetails.yearBuilt}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">
-                          Floors
-                        </div>
-                        <div className="font-semibold">
-                          {property.propertyDetails.floors}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">
-                          {property.propertyDetails.units ? "Units" : "Tenants"}
-                        </div>
-                        <div className="font-semibold">
-                          {property.propertyDetails.units ||
-                            property.propertyDetails.tenants}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">
-                          Occupancy Rate
-                        </div>
-                        <div className="font-semibold">
-                          {property.propertyDetails.occupancyRate}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-muted-foreground">
-                          Monthly Rent
-                        </div>
-                        <div className="font-semibold">
-                          $
-                          {property.propertyDetails.monthlyRent.toLocaleString()}
-                        </div>
+                        <div className="font-semibold">—</div>
                       </div>
                     </div>
                   </CardContent>
@@ -461,12 +985,12 @@ export default function PropertyDetailPage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Purchase Card */}
-            {property.status === "active" && (
+            {statusLabel === "active" && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Invest in {property.symbol}</CardTitle>
+                  <CardTitle>Invest in {proj.token.symbol}</CardTitle>
                   <CardDescription>
-                    Purchase tokens to own a share of this property
+                    Purchase tokens to own a share
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -484,14 +1008,14 @@ export default function PropertyDetailPage() {
                   {purchaseAmount && (
                     <div className="p-3 bg-muted rounded-lg">
                       <div className="text-sm text-muted-foreground">
-                        Total Investment
+                        Total Investment (est.)
                       </div>
                       <div className="text-2xl font-bold">
-                        $
-                        {(
-                          Number.parseInt(purchaseAmount) *
-                          property.pricePerToken
-                        ).toLocaleString()}
+                        {(() => {
+                          const qty = Number.parseInt(purchaseAmount) || 0;
+                          const total = qty * pricePerTokenEth;
+                          return `${total.toFixed(6)} ETH`;
+                        })()}
                       </div>
                     </div>
                   )}
@@ -520,41 +1044,38 @@ export default function PropertyDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Market Cap</span>
+                  <span className="text-muted-foreground">
+                    Market Cap (target)
+                  </span>
                   <span className="font-semibold">
-                    $
-                    {(
-                      property.totalTokens * property.pricePerToken
-                    ).toLocaleString()}
+                    {proj.reqAmountEth.toLocaleString()} ETH
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">24h Volume</span>
-                  <span className="font-semibold">$45,230</span>
+                  <span className="font-semibold">—</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Price Change</span>
-                  <span className="font-semibold text-green-600">+2.4%</span>
+                  <span className="font-semibold">—</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Liquidity</span>
-                  <span className="font-semibold">High</span>
+                  <span className="font-semibold">—</span>
                 </div>
               </CardContent>
             </Card>
 
-            {/* NEW: Waitlisted */}
+            {/* Waitlisted (UI demo only) */}
             <Card>
               <CardHeader>
                 <CardTitle>Waitlisted</CardTitle>
-                <CardDescription>
-                  Addresses requesting access to buy/sell/transfer
-                </CardDescription>
+                <CardDescription>Addresses requesting access</CardDescription>
               </CardHeader>
               <CardContent>
                 {waitlisted.length === 0 ? (
                   <div className="text-sm text-muted-foreground">
-                    No addresses are waitlisted.
+                    No addresses waitlisted.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -586,18 +1107,16 @@ export default function PropertyDetailPage() {
               </CardContent>
             </Card>
 
-            {/* NEW: Allowed */}
+            {/* Allowed (UI demo only) */}
             <Card>
               <CardHeader>
                 <CardTitle>Allowed</CardTitle>
-                <CardDescription>
-                  Addresses permitted to buy/sell/transfer
-                </CardDescription>
+                <CardDescription>Addresses permitted to trade</CardDescription>
               </CardHeader>
               <CardContent>
                 {allowed.length === 0 ? (
                   <div className="text-sm text-muted-foreground">
-                    No addresses are allowed yet.
+                    No addresses allowed yet.
                   </div>
                 ) : (
                   <div className="space-y-3">
