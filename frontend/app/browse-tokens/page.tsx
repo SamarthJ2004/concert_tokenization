@@ -726,7 +726,7 @@ export default function BrowseTokensPage() {
               return (
                 <Link key={property.id} href={`/browse-tokens/${property.id}`}>
                   <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer">
-                    <div className="aspect-video relative overflow-hidden">
+                    {/* <div className="aspect-video relative overflow-hidden">
                       <img
                         src={property.image || "/placeholder.svg"}
                         alt={property.name}
@@ -745,7 +745,7 @@ export default function BrowseTokensPage() {
                             : "Active"}
                         </Badge>
                       </div>
-                    </div>
+                    </div> */}
 
                     <CardHeader>
                       <div className="flex items-start justify-between">
@@ -769,7 +769,7 @@ export default function BrowseTokensPage() {
 
                     <CardContent className="space-y-4">
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {property.description}
+                        On-Chain Project Tokenized via Token2025
                       </p>
 
                       {/* Key Metrics */}
