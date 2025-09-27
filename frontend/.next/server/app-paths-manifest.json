@@ -1,6 +1,6 @@
 {
-  "/page": "app/page.js",
-  "/list-asset/page": "app/list-asset/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/browse-tokens/page": "app/browse-tokens/page.js",
+  "/page": "app/page.js",
   "/browse-tokens/[id]/page": "app/browse-tokens/[id]/page.js"
 }
