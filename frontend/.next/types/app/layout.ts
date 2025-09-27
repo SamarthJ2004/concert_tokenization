@@ -1,4 +1,4 @@
-// File: C:\Users\Akash Mundari\Desktop\ETH_Delhi\Platform\app\layout.tsx
+// File: C:\Users\Akash Mundari\Desktop\ETH_Delhi\concert_tokenization\frontend\app\layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
