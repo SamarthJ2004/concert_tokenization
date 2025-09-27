@@ -26,12 +26,12 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 // ---- Ethers v6 imports ----
-import { BrowserProvider, Contract, formatEther } from "ethers";
+import { BrowserProvider, Contract, formatEther, parseEther } from "ethers";
 
 // ---------------- CONFIG ----------------
-const FACTORY_ADDRESS = "0x98B03aeF4d8BF183D5805f48AF6beF5cd571571C"; // TODO: put your deployed ProjectFactory address
+const FACTORY_ADDRESS = "0x165Ec032B5F1CDb9001C8c206e026082c1a1A8a7";
 
-// Minimal ABIs (only the view functions we read)
+// ----- Minimal ABIs aligned to the provided Solidity -----
 const FACTORY_ABI = [
   {
     inputs: [
@@ -48,15 +48,21 @@ const FACTORY_ABI = [
     anonymous: false,
     inputs: [
       {
-        indexed: false,
+        indexed: true,
         internalType: "address",
         name: "project",
         type: "address",
       },
       {
-        indexed: false,
+        indexed: true,
         internalType: "address",
         name: "promoter",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "token",
         type: "address",
       },
     ],
@@ -124,7 +130,12 @@ const FACTORY_ABI = [
     outputs: [
       {
         internalType: "address",
-        name: "",
+        name: "projectAddr",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "tokenAddr",
         type: "address",
       },
     ],
@@ -212,6 +223,69 @@ const PROJECT_ABI = [
     type: "constructor",
   },
   {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "payoutWei",
+        type: "uint256",
+      },
+    ],
+    name: "InsuranceClaimed",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amountWei",
+        type: "uint256",
+      },
+    ],
+    name: "RevenueWithdrawn",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "buyer",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "wholeTokens",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "paidWei",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "insuranceCut",
+        type: "uint256",
+      },
+    ],
+    name: "TokensPurchased",
+    type: "event",
+  },
+  {
     inputs: [],
     name: "INSURANCE_BP",
     outputs: [
@@ -239,40 +313,7 @@ const PROJECT_ABI = [
   },
   {
     inputs: [],
-    name: "closeFunding",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "lossAmount",
-        type: "uint256",
-      },
-    ],
-    name: "distributeLoss",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "revenue",
-        type: "uint256",
-      },
-    ],
-    name: "distributeProfit",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "exp_return_amount",
+    name: "availableTokens",
     outputs: [
       {
         internalType: "uint256",
@@ -284,13 +325,52 @@ const PROJECT_ABI = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "wholeTokens",
+        type: "uint256",
+      },
+    ],
+    name: "buyTokens",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
     inputs: [],
-    name: "fundingClosed",
+    name: "buyWithETH",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "amountWei",
+        type: "uint256",
+      },
+    ],
+    name: "claimInsurance",
     outputs: [
       {
-        internalType: "bool",
+        internalType: "uint256",
         name: "",
-        type: "bool",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "exp_return_amount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -310,13 +390,6 @@ const PROJECT_ABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "invest",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-  {
     inputs: [
       {
         internalType: "address",
@@ -324,31 +397,12 @@ const PROJECT_ABI = [
         type: "address",
       },
     ],
-    name: "investorBalances",
+    name: "investorWholeTokens",
     outputs: [
       {
         internalType: "uint256",
         name: "",
         type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    name: "investors",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
       },
     ],
     stateMutability: "view",
@@ -357,6 +411,19 @@ const PROJECT_ABI = [
   {
     inputs: [],
     name: "min_threshold",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "pricePerWholeToken",
     outputs: [
       {
         internalType: "uint256",
@@ -395,12 +462,12 @@ const PROJECT_ABI = [
   },
   {
     inputs: [],
-    name: "revenueDistributed",
+    name: "shareToken",
     outputs: [
       {
-        internalType: "bool",
+        internalType: "contract ComplianceToken",
         name: "",
-        type: "bool",
+        type: "address",
       },
     ],
     stateMutability: "view",
@@ -408,12 +475,25 @@ const PROJECT_ABI = [
   },
   {
     inputs: [],
-    name: "shareToken",
+    name: "soldTokens",
     outputs: [
       {
-        internalType: "contract ComplianceToken",
+        internalType: "uint256",
         name: "",
-        type: "address",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "soldWholeTokens",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -434,6 +514,19 @@ const PROJECT_ABI = [
   },
   {
     inputs: [],
+    name: "tokenAddress",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "totalRaised",
     outputs: [
       {
@@ -445,6 +538,32 @@ const PROJECT_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "totalTokens",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "amountWei",
+        type: "uint256",
+      },
+    ],
+    name: "withdrawRevenue",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ];
 
 const ERC20_MIN_ABI = [
@@ -453,7 +572,7 @@ const ERC20_MIN_ABI = [
   "function decimals() view returns (uint8)",
   "function totalSupply() view returns (uint256)",
   "function balanceOf(address) view returns (uint256)",
-] as const;
+];
 
 // ---------------- TYPES ----------------
 type UiProperty = {
@@ -463,10 +582,11 @@ type UiProperty = {
   symbol: string;
   promoter: string;
   location: string; // placeholder
-  area: number; // tokens (assumed == totalSupply)
-  pricePerToken: number; // in ETH
-  totalTokens: number;
-  soldTokens: number;
+  area: number; // total whole tokens minted
+  pricePerTokenEth: number; // human ETH for 1 whole token
+  totalTokens: number; // == area
+  soldTokens: number; // from Project.soldTokens()
+  availableTokens: number; // from Project.availableTokens()
   amountRaised: number; // ETH
   targetAmount: number; // ETH
   description: string; // placeholder
@@ -491,19 +611,16 @@ export default function BrowseTokensPage() {
       setLoading(true);
       setErr(null);
       try {
-        if (!window?.ethereum) {
+        if (!(globalThis as any)?.ethereum) {
           throw new Error(
             "No wallet found. Please install MetaMask or similar."
           );
         }
 
-        const provider = new BrowserProvider(window.ethereum);
-        // Optional: request accounts so chain is available (not required for reads but helpful)
+        const provider = new BrowserProvider((globalThis as any).ethereum);
         try {
           await provider.send("eth_requestAccounts", []);
-        } catch {
-          // ignore if user cancels; reads still work on public RPC if wallet injected allows
-        }
+        } catch {}
 
         const factory = new Contract(FACTORY_ADDRESS, FACTORY_ABI, provider);
         const projectAddresses: string[] = await factory.getAllProjects();
@@ -513,75 +630,59 @@ export default function BrowseTokensPage() {
             const project = new Contract(addr, PROJECT_ABI, provider);
             const [
               promoter,
-              fundingClosed,
-              totalRaisedBN,
               areaBN,
-              reqAmountBN,
-              ,
-              ,
-              /* expReturnBN */ /* minThresholdBN */ tokenAddr,
+              reqAmountWei,
+              totalRaisedWei,
+              soldBN,
+              availableBN,
+              priceWei,
+              tokenAddr,
             ] = await Promise.all([
               project.promoter(),
-              project.fundingClosed(),
-              project.totalRaised(),
               project.area(),
               project.req_amount(),
-              project.exp_return_amount(),
-              project.min_threshold(),
-              project.shareToken(),
+              project.totalRaised(),
+              project.soldTokens(),
+              project.availableTokens(),
+              project.pricePerWholeToken(),
+              project.tokenAddress(),
             ]);
 
             const token = new Contract(tokenAddr, ERC20_MIN_ABI, provider);
-            const [
-              tokenName,
-              tokenSymbol,
-              decimals,
-              totalSupplyBN,
-              promoterBalBN,
-            ] = await Promise.all([
+            const [tokenName, tokenSymbol] = await Promise.all([
               token.name(),
               token.symbol(),
-              token.decimals(),
-              token.totalSupply(),
-              token.balanceOf(promoter),
             ]);
 
-            // Numbers & derived metrics
-            // Token supply is in smallest units; area from Project is a plain uint (assumed == totalSupply).
-            const base = 10 ** Number(decimals);
-
-            const totalSupply = Number(totalSupplyBN) / base;
-            const promoterBal = Number(promoterBalBN) / base;
-            const soldTokens = Math.max(0, totalSupply - promoterBal);
-
-            const area = Number(areaBN); // project.area() was used to mint tokens (plain units)
-            const reqAmountEth = Number(formatEther(reqAmountBN));
-            const totalRaisedEth = Number(formatEther(totalRaisedBN));
-
-            const pricePerTokenEth = area > 0 ? reqAmountEth / area : 0;
+            const area = Number(areaBN);
+            const totalRaisedEth = Number(formatEther(totalRaisedWei));
+            const reqAmountEth = Number(formatEther(reqAmountWei));
+            const pricePerTokenEth = Number(formatEther(priceWei));
+            const soldTokens = Number(soldBN);
+            const availableTokens = Number(availableBN);
 
             const status: UiProperty["status"] =
-              fundingClosed || totalRaisedEth >= reqAmountEth
+              availableTokens === 0 || totalRaisedEth >= reqAmountEth
                 ? "funded"
                 : "active";
 
-            // Fill UI object (placeholder metadata where off-chain)
             const ui: UiProperty = {
               id: index + 1,
               address: addr,
               name: tokenName,
               symbol: tokenSymbol,
               promoter,
-              location: "—", // TODO: replace with your off-chain metadata
-              area: area,
-              pricePerToken: pricePerTokenEth,
-              totalTokens: totalSupply,
+              location: "—",
+              area,
+              pricePerTokenEth,
+              totalTokens: area,
               soldTokens,
+              availableTokens,
               amountRaised: totalRaisedEth,
               targetAmount: reqAmountEth,
               description: "On-chain project tokenized via ComplianceToken.",
-              image: "/placeholder.svg", // TODO: map your project address to images if you have them
-              apy: 0, // Not on-chain; keep 0 or fetch from your off-chain DB
+              image: "/placeholder.svg",
+              apy: 0,
               status,
             };
             return ui;
@@ -610,42 +711,81 @@ export default function BrowseTokensPage() {
     );
   }, [properties, searchTerm]);
 
-  const handleBuyTokens = (propertyId: number) => {
+  async function handleBuyTokensOnChain(
+    property: UiProperty,
+    qtyWholeTokens: number
+  ) {
+    try {
+      const provider = new BrowserProvider((globalThis as any).ethereum);
+      const signer = await provider.getSigner();
+      const project = new Contract(property.address, PROJECT_ABI, signer);
+
+      // value = qty * pricePerWholeToken (wei)
+      const priceWei = await project.pricePerWholeToken();
+      const value = BigInt(priceWei) * BigInt(qtyWholeTokens);
+
+      const tx = await project.buyTokens(qtyWholeTokens, { value });
+      toast({ title: "Transaction sent", description: `Hash: ${tx.hash}` });
+      const rcpt = await tx.wait();
+      toast({
+        title: "Purchase confirmed",
+        description: `Block: ${rcpt.blockNumber}`,
+      });
+
+      // simple refresh of this card's data
+      const [totalRaisedWei, soldBN, availableBN] = await Promise.all([
+        project.totalRaised(),
+        project.soldTokens(),
+        project.availableTokens(),
+      ]);
+
+      setProperties((prev) =>
+        prev.map((p) => {
+          if (p.address !== property.address) return p;
+          const amountRaised = Number(formatEther(totalRaisedWei));
+          const soldTokens = Number(soldBN);
+          const availableTokens = Number(availableBN);
+          const status: UiProperty["status"] =
+            availableTokens === 0 || amountRaised >= p.targetAmount
+              ? "funded"
+              : "active";
+          return { ...p, amountRaised, soldTokens, availableTokens, status };
+        })
+      );
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        title: "Purchase failed",
+        description: e?.message ?? "Error sending transaction",
+        variant: "destructive",
+      });
+    }
+  }
+
+  const handleBuyTokens = async (propertyId: number) => {
     const property = properties.find((p) => p.id === propertyId);
     if (!property || !purchaseAmount) return;
 
     const amount = Number.parseInt(purchaseAmount);
-    if (amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       toast({
         title: "Invalid Amount",
-        description: "Please enter a valid number of tokens to purchase.",
+        description: "Enter a valid whole-token amount.",
         variant: "destructive",
       });
       return;
     }
 
-    const availableTokens = Math.max(
-      0,
-      property.totalTokens - property.soldTokens
-    );
-    if (amount > availableTokens) {
+    if (amount > property.availableTokens) {
       toast({
         title: "Insufficient Tokens",
-        description: `Only ${availableTokens} tokens available for purchase.`,
+        description: `Only ${property.availableTokens} tokens available.`,
         variant: "destructive",
       });
       return;
     }
 
-    // NOTE: Actual buy flow requires:
-    // 1) user sends ETH to project.invest()
-    // 2) promoter must have approved tokens to project (shareToken.approve(project, area)) beforehand
-    toast({
-      title: "Demo Only",
-      description:
-        "This button is a demo. Wire up project.invest() to actually purchase.",
-    });
-
+    await handleBuyTokensOnChain(property, amount);
     setPurchaseAmount("");
     setSelectedProperty(null);
   };
@@ -655,9 +795,8 @@ export default function BrowseTokensPage() {
     if (!property || !purchaseAmount) return;
 
     toast({
-      title: "Demo Only",
-      description:
-        "Selling would require a marketplace. This is a placeholder action.",
+      title: "Marketplace not implemented",
+      description: "Secondary selling would require a marketplace.",
     });
 
     setPurchaseAmount("");
@@ -718,35 +857,10 @@ export default function BrowseTokensPage() {
                 property.targetAmount > 0
                   ? (property.amountRaised / property.targetAmount) * 100
                   : 0;
-              const availableTokens = Math.max(
-                0,
-                property.totalTokens - property.soldTokens
-              );
 
               return (
                 <Link key={property.id} href={`/browse-tokens/${property.id}`}>
                   <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer">
-                    <div className="aspect-video relative overflow-hidden">
-                      <img
-                        src={property.image || "/placeholder.svg"}
-                        alt={property.name}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-4 right-4">
-                        <Badge
-                          variant={
-                            property.status === "funded"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {property.status === "funded"
-                            ? "Fully Funded"
-                            : "Active"}
-                        </Badge>
-                      </div>
-                    </div>
-
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>
@@ -769,7 +883,7 @@ export default function BrowseTokensPage() {
 
                     <CardContent className="space-y-4">
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {property.description}
+                        On-Chain Project Tokenized via Token2025
                       </p>
 
                       {/* Key Metrics */}
@@ -779,27 +893,29 @@ export default function BrowseTokensPage() {
                             Price per Token
                           </div>
                           <div className="font-semibold">
-                            {property.pricePerToken.toFixed(6)} ETH
+                            {property.pricePerTokenEth.toFixed(6)} ETH
                           </div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">
-                            Expected APY
+                            Token Symbol
                           </div>
                           <div className="font-semibold text-accent">
-                            {property.apy}%
+                            {property.symbol}
                           </div>
                         </div>
                         <div>
-                          <div className="text-muted-foreground">Area</div>
+                          <div className="text-muted-foreground">
+                            Total Supply
+                          </div>
                           <div className="font-semibold">
-                            {property.area.toLocaleString()} tokens
+                            {property.totalTokens.toLocaleString()} tokens
                           </div>
                         </div>
                         <div>
                           <div className="text-muted-foreground">Available</div>
                           <div className="font-semibold">
-                            {availableTokens.toLocaleString()} tokens
+                            {property.availableTokens.toLocaleString()} tokens
                           </div>
                         </div>
                       </div>
@@ -838,7 +954,7 @@ export default function BrowseTokensPage() {
                             <ShoppingCart className="h-4 w-4" />
                             Buy
                           </Button>
-                          <Button
+                          {/* <Button
                             variant="outline"
                             className="flex-1 gap-2 bg-transparent"
                             onClick={(e) => {
@@ -846,9 +962,9 @@ export default function BrowseTokensPage() {
                               setSelectedProperty(property.id);
                             }}
                           >
-                            <Wallet className="h-4 w-4" />
-                            Sell
-                          </Button>
+                            {/* <Wallet className="h-4 w-4" />
+                            Sell */}
+                          {/* </Button> */}
                         </div>
                       ) : (
                         <Button disabled className="w-full">
@@ -872,12 +988,12 @@ export default function BrowseTokensPage() {
                   {properties.find((p) => p.id === selectedProperty)?.name}
                 </CardTitle>
                 <CardDescription>
-                  Enter the number of tokens you want to trade
+                  Enter the number of whole tokens you want to buy
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Number of Tokens</Label>
+                  <Label htmlFor="amount">Number of Whole Tokens</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -896,7 +1012,7 @@ export default function BrowseTokensPage() {
                       {(() => {
                         const p =
                           properties.find((x) => x.id === selectedProperty)
-                            ?.pricePerToken ?? 0;
+                            ?.pricePerTokenEth ?? 0;
                         const qty = Number.parseInt(purchaseAmount) || 0;
                         const total = qty * p;
                         return `${total.toLocaleString()} ETH`;
@@ -912,13 +1028,13 @@ export default function BrowseTokensPage() {
                   >
                     Buy Tokens
                   </Button>
-                  <Button
+                  {/* <Button
                     variant="outline"
                     className="flex-1 bg-transparent"
                     onClick={() => handleSellTokens(selectedProperty)}
                   >
                     Sell Tokens
-                  </Button>
+                  </Button> */}
                 </div>
 
                 <Button
