@@ -1,7 +1,7 @@
-import { Navigation } from "@/components/navigation";
-import { HeroSection } from "@/components/hero-section";
-import { ActionCards } from "@/components/action-cards";
-import { FeaturesSection } from "@/components/features-section";
+import { Navigation } from "../components/navigation";
+import { HeroSection } from "../components/hero-section";
+import { ActionCards } from "../components/action-cards";
+import { FeaturesSection } from "../components/features-section";
 
 export default function HomePage() {
   return (
