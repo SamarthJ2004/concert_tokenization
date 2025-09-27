@@ -184,7 +184,7 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="text-xl font-bold text-foreground">
-              RWA<span className="text-accent">Chain</span>
+              TOKEN<span className="text-accent">2025</span>
             </Link>
           </div>
 

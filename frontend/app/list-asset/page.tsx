@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigation } from "@/components/navigation";
 import {
   Card,
@@ -15,13 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Upload,
-  FileText,
-  CheckCircle,
-  Loader2,
-  ArrowLeft,
-} from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { ethers } from "ethers";
@@ -33,7 +27,11 @@ declare global {
   }
 }
 
-// --- Minimal ABI for ProjectFactory.createProject(...) ---
+/**
+ * --- Updated Minimal ABI for ProjectFactory (new contracts) ---
+ * - createProject returns (address project, address token)
+ * - ProjectCreated(project indexed, promoter indexed, token non-indexed)
+ */
 const PROJECT_FACTORY_ABI = [
   {
     inputs: [
@@ -50,15 +48,21 @@ const PROJECT_FACTORY_ABI = [
     anonymous: false,
     inputs: [
       {
-        indexed: false,
+        indexed: true,
         internalType: "address",
         name: "project",
         type: "address",
       },
       {
-        indexed: false,
+        indexed: true,
         internalType: "address",
         name: "promoter",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "token",
         type: "address",
       },
     ],
@@ -126,7 +130,12 @@ const PROJECT_FACTORY_ABI = [
     outputs: [
       {
         internalType: "address",
-        name: "",
+        name: "projectAddr",
+        type: "address",
+      },
+      {
+        internalType: "address",
+        name: "tokenAddr",
         type: "address",
       },
     ],
@@ -161,7 +170,7 @@ const PROJECT_FACTORY_ABI = [
   },
 ];
 
-const PROJECT_FACTORY_ADDRESS = "0x98B03aeF4d8BF183D5805f48AF6beF5cd571571C";
+const PROJECT_FACTORY_ADDRESS = "0x165Ec032B5F1CDb9001C8c206e026082c1a1A8a7";
 
 export default function ListAssetPage() {
   const [isVerifying, setIsVerifying] = useState(false);
@@ -171,7 +180,7 @@ export default function ListAssetPage() {
     tokenSymbol: "",
     area: "",
     location: "",
-    pricePerToken: "",
+    pricePerToken: "", // purely display; we auto-fill based on amountToRaise/area if possible
     amountToRaise: "",
     expReturn: "",
     minThreshold: "",
@@ -179,6 +188,33 @@ export default function ListAssetPage() {
     description: "",
   });
   const { toast } = useToast();
+
+  // auto-calc the (display) price per token if amountToRaise & area are filled and valid
+  useEffect(() => {
+    const areaNum = Number(formData.area);
+    const amt = formData.amountToRaise;
+    if (!isNaN(areaNum) && areaNum > 0 && amt) {
+      const a = BigInt(isFinite(areaNum) ? Math.floor(areaNum) : 0);
+      try {
+        const reqWei = ethers.parseEther(amt);
+        if (a > BigInt(0)) {
+          const priceWei = reqWei / a;
+          // if not exact division, leave display blank to hint it's not valid
+          if (reqWei % a === BigInt(0)) {
+            // show in ETH with up to 6 decimals for readability
+            const priceEth = Number(ethers.formatEther(priceWei));
+            setFormData((prev) => ({
+              ...prev,
+              pricePerToken: priceEth.toFixed(6).replace(/\.?0+$/, ""),
+            }));
+          }
+        }
+      } catch {
+        /* ignore display calc errors */
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.amountToRaise, formData.area]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -218,8 +254,8 @@ export default function ListAssetPage() {
     // Validate numeric fields
     if (isNaN(Number(formData.area)) || Number(formData.area) <= 0) {
       toast({
-        title: "Invalid Area",
-        description: "Area must be a positive number",
+        title: "Invalid Total Tokens",
+        description: "Total tokens must be a positive integer",
         variant: "destructive",
       });
       return false;
@@ -249,46 +285,54 @@ export default function ListAssetPage() {
       return false;
     }
 
+    // NEW: enforce req_amount % area == 0 (in wei) to match contract requirement
+    try {
+      const areaBig = BigInt(formData.area);
+      const reqWei = ethers.parseEther(formData.amountToRaise);
+      if (reqWei % areaBig !== BigInt(0)) {
+        toast({
+          title: "Invalid Price Per Token",
+          description:
+            "Amount to raise must be divisible by Total Tokens (in wei). Adjust either value so price per token is an exact amount.",
+          variant: "destructive",
+          duration: 8000,
+        });
+        return false;
+      }
+    } catch {
+      toast({
+        title: "Invalid Numbers",
+        description: "Please check Total Tokens and Amount to Raise.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    console.log("Form submitted"); // Debug log
-
-    // Validate form first
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       setIsVerifying(true);
 
-      // Check if wallet is available
       if (typeof window === "undefined" || !window.ethereum) {
         throw new Error("No Ethereum wallet found. Please install MetaMask.");
       }
 
-      console.log("Connecting to wallet..."); // Debug log
-
-      // Request wallet connection
       const accounts = await window.ethereum.request({
         method: "eth_requestAccounts",
       });
-
       if (!accounts || accounts.length === 0) {
         throw new Error("No accounts found. Please connect your wallet.");
       }
 
-      console.log("Wallet connected:", accounts[0]); // Debug log
-
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      console.log("Preparing transaction parameters..."); // Debug log
-
-      // Prepare transaction parameters with better error handling
       const name = formData.name.trim();
       const symbol = formData.tokenSymbol.trim().toUpperCase();
 
@@ -308,30 +352,23 @@ export default function ListAssetPage() {
           ? ethers.parseEther(formData.minThreshold)
           : BigInt(0);
         timeout = BigInt(Math.floor(Number(formData.timeoutDays) * 86400));
-      } catch (parseError) {
+      } catch {
         throw new Error("Invalid numeric values. Please check your inputs.");
       }
 
-      console.log("Transaction parameters:", {
-        name,
-        symbol,
-        area: area.toString(),
-        req_amount: req_amount.toString(),
-        exp_return_amount: exp_return_amount.toString(),
-        min_threshold: min_threshold.toString(),
-        timeout: timeout.toString(),
-      });
+      // Final safety check for divisibility (exact same as in validateForm)
+      if (req_amount % area !== BigInt(0)) {
+        throw new Error(
+          "Amount to raise must be divisible by Total Tokens (exact, in wei)."
+        );
+      }
 
-      // Create contract instance
       const factory = new ethers.Contract(
         PROJECT_FACTORY_ADDRESS,
         PROJECT_FACTORY_ABI,
         signer
       );
 
-      console.log("Calling createProject..."); // Debug log
-
-      // Call the contract function
       const tx = await factory.createProject(
         name,
         symbol,
@@ -342,41 +379,41 @@ export default function ListAssetPage() {
         timeout
       );
 
-      console.log("Transaction sent:", tx.hash);
-
       toast({
         title: "Transaction Sent",
         description: `Hash: ${tx.hash.slice(0, 10)}…`,
       });
 
-      console.log("Waiting for transaction confirmation..."); // Debug log
-
       const receipt = await tx.wait();
 
-      console.log("Transaction confirmed:", receipt);
-
-      // Try to extract the created project address from events
-      let createdAddress: string | undefined;
+      // Parse ProjectCreated(project, promoter, token)
+      let projectAddr: string | undefined;
+      let tokenAddr: string | undefined;
       try {
-        const projectCreatedTopic = ethers.id(
-          "ProjectCreated(address,address)"
-        );
-        const log = receipt.logs.find(
-          (log: any) => log.topics && log.topics[0] === projectCreatedTopic
-        );
-        if (log && log.topics.length > 1) {
-          createdAddress = ethers.getAddress("0x" + log.topics[1].slice(26));
+        const iface = new ethers.Interface(PROJECT_FACTORY_ABI as any);
+        for (const log of receipt.logs) {
+          try {
+            const parsed = iface.parseLog(log);
+            if (parsed?.name === "ProjectCreated") {
+              projectAddr = parsed.args.project as string;
+              tokenAddr = parsed.args.token as string;
+              break;
+            }
+          } catch {
+            // not our event; skip
+          }
         }
-      } catch (eventError) {
-        console.warn("Could not parse ProjectCreated event:", eventError);
+      } catch (err) {
+        console.warn("Event parsing failed:", err);
       }
 
       toast({
         title: "Project Created Successfully!",
-        description: createdAddress
-          ? `Project Address: ${createdAddress}`
-          : "Transaction confirmed successfully!",
-        duration: 8000,
+        description:
+          projectAddr && tokenAddr
+            ? `Project: ${projectAddr}  •  Token: ${tokenAddr}`
+            : "Transaction confirmed successfully!",
+        duration: 9000,
       });
 
       // Reset form
@@ -397,12 +434,13 @@ export default function ListAssetPage() {
       console.error("Error creating project:", error);
 
       let errorMessage = "An unexpected error occurred.";
-
       if (error.code === 4001) {
         errorMessage = "Transaction was rejected by user.";
       } else if (error.code === -32603) {
         errorMessage =
           "Internal JSON-RPC error. Please check your network connection.";
+      } else if (error.reason) {
+        errorMessage = error.reason;
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -411,7 +449,7 @@ export default function ListAssetPage() {
         title: "Failed to Create Project",
         description: errorMessage,
         variant: "destructive",
-        duration: 8000,
+        duration: 9000,
       });
     } finally {
       setIsVerifying(false);
@@ -501,6 +539,7 @@ export default function ListAssetPage() {
                       value={formData.area}
                       onChange={handleInputChange}
                       min="1"
+                      step="1"
                       required
                     />
                   </div>
@@ -570,21 +609,20 @@ export default function ListAssetPage() {
                   </div>
                 </div>
 
-                {/* Optional Display Field */}
+                {/* Display-only Price Per Token (auto-filled if divisible) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="pricePerToken">
-                      Price per Token (display only)
+                      Price per Token (auto)
                     </Label>
                     <Input
                       id="pricePerToken"
                       name="pricePerToken"
-                      type="number"
-                      step="0.01"
-                      placeholder="e.g., 100.00"
+                      type="text"
+                      placeholder="auto-calculated"
                       value={formData.pricePerToken}
                       onChange={handleInputChange}
-                      min="0"
+                      readOnly
                     />
                   </div>
                 </div>
@@ -602,41 +640,6 @@ export default function ListAssetPage() {
                     required
                   />
                 </div>
-
-                {/* File Upload Section */}
-                {/* <div className="space-y-2">
-                  <Label htmlFor="document-upload">
-                    Verification Documents (Optional)
-                  </Label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                    <div className="text-center">
-                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="mt-4">
-                        <label
-                          htmlFor="document-upload"
-                          className="cursor-pointer"
-                        >
-                          <span className="mt-2 block text-sm font-medium text-gray-900">
-                            {uploadedFile
-                              ? uploadedFile.name
-                              : "Click to upload or drag and drop"}
-                          </span>
-                          <span className="mt-1 block text-xs text-gray-500">
-                            PDF, DOC, DOCX up to 10MB
-                          </span>
-                        </label>
-                        <input
-                          id="document-upload"
-                          name="document-upload"
-                          type="file"
-                          className="sr-only"
-                          onChange={handleFileUpload}
-                          accept=".pdf,.doc,.docx"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div> */}
 
                 {/* Submit Button */}
                 <Button
