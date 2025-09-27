@@ -1,16 +1,29 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Navigation } from "@/components/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { MapPin, ArrowLeft, Search, Filter, ShoppingCart, Wallet } from "lucide-react"
-import Link from "next/link"
-import { useToast } from "@/hooks/use-toast"
+import { useState } from "react";
+import { Navigation } from "@/components/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  MapPin,
+  ArrowLeft,
+  Search,
+  Filter,
+  ShoppingCart,
+  Wallet,
+} from "lucide-react";
+import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 // Mock data for listed properties
 const mockProperties = [
@@ -25,7 +38,8 @@ const mockProperties = [
     soldTokens: 7500,
     amountRaised: 750000,
     targetAmount: 1000000,
-    description: "Prime commercial real estate in the heart of Manhattan with high-end retail tenants.",
+    description:
+      "Prime commercial real estate in the heart of Manhattan with high-end retail tenants.",
     image: "/modern-commercial-building.png",
     apy: 8.5,
     status: "active",
@@ -41,7 +55,8 @@ const mockProperties = [
     soldTokens: 3200,
     amountRaised: 800000,
     targetAmount: 2000000,
-    description: "High-end residential complex with premium amenities and ocean views.",
+    description:
+      "High-end residential complex with premium amenities and ocean views.",
     image: "/luxury-apartment-complex.png",
     apy: 6.8,
     status: "active",
@@ -57,7 +72,8 @@ const mockProperties = [
     soldTokens: 20000,
     amountRaised: 1000000,
     targetAmount: 1000000,
-    description: "Strategic logistics hub with long-term industrial tenants and stable cash flow.",
+    description:
+      "Strategic logistics hub with long-term industrial tenants and stable cash flow.",
     image: "/industrial-warehouse.png",
     apy: 9.2,
     status: "funded",
@@ -73,71 +89,74 @@ const mockProperties = [
     soldTokens: 4800,
     amountRaised: 720000,
     targetAmount: 1800000,
-    description: "Modern office park in Austin's tech corridor with major tech company tenants.",
+    description:
+      "Modern office park in Austin's tech corridor with major tech company tenants.",
     image: "/modern-office-park-tech-campus.jpg",
     apy: 7.5,
     status: "active",
   },
-]
+];
 
 export default function BrowseTokensPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedProperty, setSelectedProperty] = useState<number | null>(null)
-  const [purchaseAmount, setPurchaseAmount] = useState("")
-  const { toast } = useToast()
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProperty, setSelectedProperty] = useState<number | null>(null);
+  const [purchaseAmount, setPurchaseAmount] = useState("");
+  const { toast } = useToast();
 
   const filteredProperties = mockProperties.filter(
     (property) =>
       property.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       property.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.symbol.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      property.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleBuyTokens = (propertyId: number) => {
-    const property = mockProperties.find((p) => p.id === propertyId)
-    if (!property || !purchaseAmount) return
+    const property = mockProperties.find((p) => p.id === propertyId);
+    if (!property || !purchaseAmount) return;
 
-    const amount = Number.parseInt(purchaseAmount)
+    const amount = Number.parseInt(purchaseAmount);
     if (amount <= 0) {
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid number of tokens to purchase.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    const availableTokens = property.totalTokens - property.soldTokens
+    const availableTokens = property.totalTokens - property.soldTokens;
     if (amount > availableTokens) {
       toast({
         title: "Insufficient Tokens",
         description: `Only ${availableTokens} tokens available for purchase.`,
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     toast({
       title: "Purchase Successful!",
-      description: `Successfully purchased ${amount} ${property.symbol} tokens for $${(amount * property.pricePerToken).toLocaleString()}.`,
-    })
+      description: `Successfully purchased ${amount} ${
+        property.symbol
+      } tokens for $${(amount * property.pricePerToken).toLocaleString()}.`,
+    });
 
-    setPurchaseAmount("")
-    setSelectedProperty(null)
-  }
+    setPurchaseAmount("");
+    setSelectedProperty(null);
+  };
 
   const handleSellTokens = (propertyId: number) => {
-    const property = mockProperties.find((p) => p.id === propertyId)
-    if (!property || !purchaseAmount) return
+    const property = mockProperties.find((p) => p.id === propertyId);
+    if (!property || !purchaseAmount) return;
 
     toast({
       title: "Sell Order Placed",
       description: `Your sell order for ${purchaseAmount} ${property.symbol} tokens has been placed on the marketplace.`,
-    })
+    });
 
-    setPurchaseAmount("")
-    setSelectedProperty(null)
-  }
+    setPurchaseAmount("");
+    setSelectedProperty(null);
+  };
 
   return (
     <main className="min-h-screen bg-background">
@@ -146,13 +165,17 @@ export default function BrowseTokensPage() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to Home
           </Link>
           <h1 className="text-3xl font-bold mb-2">Browse RWA Tokens</h1>
           <p className="text-muted-foreground">
-            Discover and invest in tokenized real-world assets from around the globe.
+            Discover and invest in tokenized real-world assets from around the
+            globe.
           </p>
         </div>
 
@@ -176,8 +199,9 @@ export default function BrowseTokensPage() {
         {/* Properties Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProperties.map((property) => {
-            const progressPercentage = (property.soldTokens / property.totalTokens) * 100
-            const availableTokens = property.totalTokens - property.soldTokens
+            const progressPercentage =
+              (property.soldTokens / property.totalTokens) * 100;
+            const availableTokens = property.totalTokens - property.soldTokens;
 
             return (
               <Link key={property.id} href={`/browse-tokens/${property.id}`}>
@@ -189,8 +213,14 @@ export default function BrowseTokensPage() {
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-4 right-4">
-                      <Badge variant={property.status === "funded" ? "default" : "secondary"}>
-                        {property.status === "funded" ? "Fully Funded" : "Active"}
+                      <Badge
+                        variant={
+                          property.status === "funded" ? "default" : "secondary"
+                        }
+                      >
+                        {property.status === "funded"
+                          ? "Fully Funded"
+                          : "Active"}
                       </Badge>
                     </div>
                   </div>
@@ -198,7 +228,9 @@ export default function BrowseTokensPage() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-lg">{property.name}</CardTitle>
+                        <CardTitle className="text-lg">
+                          {property.name}
+                        </CardTitle>
                         <CardDescription className="flex items-center gap-1 mt-1">
                           <MapPin className="h-3 w-3" />
                           {property.location}
@@ -211,38 +243,60 @@ export default function BrowseTokensPage() {
                   </CardHeader>
 
                   <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground line-clamp-2">{property.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {property.description}
+                    </p>
 
                     {/* Key Metrics */}
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <div className="text-muted-foreground">Price per Token</div>
-                        <div className="font-semibold">${property.pricePerToken}</div>
+                        <div className="text-muted-foreground">
+                          Price per Token
+                        </div>
+                        <div className="font-semibold">
+                          ${property.pricePerToken}
+                        </div>
                       </div>
                       <div>
-                        <div className="text-muted-foreground">Expected APY</div>
-                        <div className="font-semibold text-accent">{property.apy}%</div>
+                        <div className="text-muted-foreground">
+                          Expected APY
+                        </div>
+                        <div className="font-semibold text-accent">
+                          {property.apy}%
+                        </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Area</div>
-                        <div className="font-semibold">{property.area.toLocaleString()} sq ft</div>
+                        <div className="font-semibold">
+                          {property.area.toLocaleString()} sq ft
+                        </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Available</div>
-                        <div className="font-semibold">{availableTokens.toLocaleString()} tokens</div>
+                        <div className="font-semibold">
+                          {availableTokens.toLocaleString()} tokens
+                        </div>
                       </div>
                     </div>
 
                     {/* Progress Bar */}
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Funding Progress</span>
-                        <span className="font-medium">{progressPercentage.toFixed(1)}%</span>
+                        <span className="text-muted-foreground">
+                          Funding Progress
+                        </span>
+                        <span className="font-medium">
+                          {progressPercentage.toFixed(1)}%
+                        </span>
                       </div>
                       <Progress value={progressPercentage} className="h-2" />
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>${property.amountRaised.toLocaleString()} raised</span>
-                        <span>${property.targetAmount.toLocaleString()} target</span>
+                        <span>
+                          ${property.amountRaised.toLocaleString()} raised
+                        </span>
+                        <span>
+                          ${property.targetAmount.toLocaleString()} target
+                        </span>
                       </div>
                     </div>
 
@@ -252,8 +306,8 @@ export default function BrowseTokensPage() {
                         <Button
                           className="flex-1 gap-2"
                           onClick={(e) => {
-                            e.preventDefault()
-                            setSelectedProperty(property.id)
+                            e.preventDefault();
+                            setSelectedProperty(property.id);
                           }}
                         >
                           <ShoppingCart className="h-4 w-4" />
@@ -263,8 +317,8 @@ export default function BrowseTokensPage() {
                           variant="outline"
                           className="flex-1 gap-2 bg-transparent"
                           onClick={(e) => {
-                            e.preventDefault()
-                            setSelectedProperty(property.id)
+                            e.preventDefault();
+                            setSelectedProperty(property.id);
                           }}
                         >
                           <Wallet className="h-4 w-4" />
@@ -279,7 +333,7 @@ export default function BrowseTokensPage() {
                   </CardContent>
                 </Card>
               </Link>
-            )
+            );
           })}
         </div>
 
@@ -288,8 +342,12 @@ export default function BrowseTokensPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <Card className="w-full max-w-md">
               <CardHeader>
-                <CardTitle>{mockProperties.find((p) => p.id === selectedProperty)?.name}</CardTitle>
-                <CardDescription>Enter the number of tokens you want to trade</CardDescription>
+                <CardTitle>
+                  {mockProperties.find((p) => p.id === selectedProperty)?.name}
+                </CardTitle>
+                <CardDescription>
+                  Enter the number of tokens you want to trade
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -305,19 +363,25 @@ export default function BrowseTokensPage() {
 
                 {purchaseAmount && (
                   <div className="p-3 bg-muted rounded-lg">
-                    <div className="text-sm text-muted-foreground">Total Cost</div>
+                    <div className="text-sm text-muted-foreground">
+                      Total Cost
+                    </div>
                     <div className="text-lg font-semibold">
                       $
                       {(
                         Number.parseInt(purchaseAmount) *
-                        (mockProperties.find((p) => p.id === selectedProperty)?.pricePerToken || 0)
+                        (mockProperties.find((p) => p.id === selectedProperty)
+                          ?.pricePerToken || 0)
                       ).toLocaleString()}
                     </div>
                   </div>
                 )}
 
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => handleBuyTokens(selectedProperty)}>
+                  <Button
+                    className="flex-1"
+                    onClick={() => handleBuyTokens(selectedProperty)}
+                  >
                     Buy Tokens
                   </Button>
                   <Button
@@ -333,8 +397,8 @@ export default function BrowseTokensPage() {
                   variant="ghost"
                   className="w-full"
                   onClick={() => {
-                    setSelectedProperty(null)
-                    setPurchaseAmount("")
+                    setSelectedProperty(null);
+                    setPurchaseAmount("");
                   }}
                 >
                   Cancel
@@ -345,5 +409,5 @@ export default function BrowseTokensPage() {
         )}
       </div>
     </main>
-  )
+  );
 }
