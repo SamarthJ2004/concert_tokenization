@@ -41,18 +41,12 @@ Token2025 replaces intermediaries with **autonomous smart contracts**, creating 
    * A new **ComplianceToken (ERC-3643 variant)** is minted, e.g., `ConcertToken (CRT)`.
    * Token compliance checks `IdentityRegistry` to ensure only **KYC-verified wallets** can invest.
 
-3. **Global Funding (PyUSD on Integra)**
-
-   * Investors browse upcoming events.
-   * They commit **PyUSD** directly into the Project contract.
-   * They receive CRT tokens representing their share.
-
-4. **Shared Safety Net (Insurance Pool)**
+3. **Shared Safety Net (Insurance Pool)**
 
    * A % of the raise is automatically contributed to `InsurancePool`.
    * Protects investors in case of **event cancellation or loss**.
 
-5. **Event Outcome**
+4. **Event Outcome**
 
    * **Profit case**: Promoter submits revenue → funds distributed proportionally to token holders.
    * **Loss case**: Insurance pool pays out compensation (e.g., 50% of raised amount) to investors.
@@ -73,7 +67,6 @@ Token2025 replaces intermediaries with **autonomous smart contracts**, creating 
 
 * Each **event = new ERC-3643 token (ComplianceToken)**.
 * **Promoter initially receives all tokens** but contract auto-approves itself.
-* Investors swap **PyUSD → CRT tokens** via Project contract.
 * Revenue or insurance payouts flow back proportionally to CRT holders.
 
 ---
@@ -84,7 +77,6 @@ Token2025 replaces intermediaries with **autonomous smart contracts**, creating 
 * **ENS-Powered Identity** → Each verified user gets a subdomain (e.g., `alice.token2025.eth`).
 * **Dynamic Profiles** → Users manage ENS text records (KYC, accreditation, etc.).
 * **Insurance Pool** → Built-in safety net for investor confidence.
-* **Global Payments (PyUSD)** → USD-denominated stablecoin for predictable fundraising.
 
 ---
 
@@ -92,7 +84,6 @@ Token2025 replaces intermediaries with **autonomous smart contracts**, creating 
 
 * **Smart Contracts**: Solidity, OpenZeppelin, ERC-3643, Integra L2
 * **Identity**: ENS subdomains + Verifiable Credentials
-* **Payments**: PyUSD
 * **Frontend**: Next.js, Ethers.js
 
 ---
@@ -101,13 +92,14 @@ Token2025 replaces intermediaries with **autonomous smart contracts**, creating 
 
 1. Promoter creates `Concert Project`.
 2. 100 shares minted (CRT).
-3. Investors commit **80 PyUSD each** → receive 1 CRT.
+3. Investors commit → receive 1 CRT.
 4. Event ends →
 
-   * If **profit**: 10,000 PyUSD revenue → distributed to CRT holders.
+   * If **profit**: revenue → distributed to CRT holders.
    * If **loss**: InsurancePool distributes partial refund.
   
-  <img width="8844" height="8853" alt="flowchart" src="https://github.com/user-attachments/assets/59fa026c-35d5-401b-b9a4-587f74d770a4" />
+<img width="8844" height="8853" alt="flowchart" src="https://github.com/user-attachments/assets/1a53c950-e6d3-4bbc-bbb7-8e278a9b83e3" />
+
 
 ---
 
