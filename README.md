@@ -98,7 +98,7 @@ Token2025 replaces intermediaries with **autonomous smart contracts**, creating 
    * If **profit**: revenue → distributed to CRT holders.
    * If **loss**: InsurancePool distributes partial refund.
   
-<img width="8844" height="8853" alt="flowchart" src="https://github.com/user-attachments/assets/1a53c950-e6d3-4bbc-bbb7-8e278a9b83e3" />
+<img width="8045" height="7663" alt="flowchart" src="https://github.com/user-attachments/assets/23ee288c-c626-4bb2-9ea5-193bf71cf728" />
 
 
 ---
