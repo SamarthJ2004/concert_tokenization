@@ -579,6 +579,7 @@ type UiProperty = {
   id: number;
   address: string;
   name: string;
+  customName?: string; // Optional custom ENS-style name
   symbol: string;
   promoter: string;
   location: string; // placeholder
@@ -620,7 +621,7 @@ export default function BrowseTokensPage() {
         const provider = new BrowserProvider((globalThis as any).ethereum);
         try {
           await provider.send("eth_requestAccounts", []);
-        } catch {}
+        } catch { }
 
         const factory = new Contract(FACTORY_ADDRESS, FACTORY_ABI, provider);
         const projectAddresses: string[] = await factory.getAllProjects();
@@ -666,10 +667,15 @@ export default function BrowseTokensPage() {
                 ? "funded"
                 : "active";
 
+            // QUICKFIX: Check for custom name in localStorage
+            const existingMappings = JSON.parse(localStorage.getItem('ensNames') || '{}');
+            const customName = existingMappings[addr.toLowerCase()];
+
             const ui: UiProperty = {
               id: index + 1,
               address: addr,
-              name: tokenName,
+              name: tokenName, // Keep original name
+              customName: customName, // Add custom name as separate field
               symbol: tokenSymbol,
               promoter,
               location: "—",
@@ -865,7 +871,23 @@ export default function BrowseTokensPage() {
                       <div className="flex items-start justify-between">
                         <div>
                           <CardTitle className="text-lg">
-                            {property.name}
+                            {property.customName ? (
+                              <div>
+                                <div className="text-lg  font-normal">
+                                  {property.name}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm ">
+
+                                    <span className="text-muted-foreground">ENS name:</span>
+                                    {property.customName}
+                                  </span>
+
+                                </div>
+                              </div>
+                            ) : (
+                              property.name
+                            )}
                           </CardTitle>
                           <CardDescription className="flex items-center gap-1 mt-1">
                             <MapPin className="h-3 w-3" />
@@ -985,7 +1007,26 @@ export default function BrowseTokensPage() {
             <Card className="w-full max-w-md">
               <CardHeader>
                 <CardTitle>
-                  {properties.find((p) => p.id === selectedProperty)?.name}
+                  {(() => {
+                    const property = properties.find((p) => p.id === selectedProperty);
+                    if (!property) return null;
+
+                    return property.customName ? (
+                      <div>
+                        <div className="flex items-center gap-2">
+                          {property.customName}
+                          <Badge variant="secondary" className="text-xs px-1 py-0">
+                            ✨
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground font-normal">
+                          {property.name}
+                        </div>
+                      </div>
+                    ) : (
+                      property.name
+                    );
+                  })()}
                 </CardTitle>
                 <CardDescription>
                   Enter the number of whole tokens you want to buy

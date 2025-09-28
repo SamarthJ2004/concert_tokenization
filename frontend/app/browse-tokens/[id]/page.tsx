@@ -11,6 +11,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { Navigation } from "@/components/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +41,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ethers } from "ethers";
+import { normalize, namehash } from "viem/ens";
+import { createPublicClient } from "viem";
+import { sepolia } from "viem/chains";
+import { createWalletClient, http } from "viem";
 
 // ---------- ethers v6 ----------
 import {
@@ -583,7 +601,7 @@ const ERC20_MIN_ABI = [
   "function decimals() view returns (uint8)",
   "function totalSupply() view returns (uint256)",
   "function balanceOf(address) view returns (uint256)",
-] ;
+];
 
 // ---------------- TYPES ----------------
 type ProjectUi = {
@@ -610,7 +628,7 @@ export default function PropertyDetailPage() {
   const params = useParams<{ id: string }>();
   const routeId = String(params.id);
   const { toast } = useToast();
-
+  const [ENSName, setENSName] = useState<string | null>(null);
   const [purchaseAmount, setPurchaseAmount] = useState(""); // tokens (whole)
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -652,7 +670,7 @@ export default function PropertyDetailPage() {
         const provider = new BrowserProvider((globalThis as any).ethereum);
         try {
           await provider.send("eth_requestAccounts", []);
-        } catch {}
+        } catch { }
 
         const projectAddr = await resolveProjectAddress(provider);
         const project = new Contract(projectAddr, PROJECT_ABI, provider);
@@ -724,6 +742,33 @@ export default function PropertyDetailPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeId]);
+
+  // ENS name lookup for project contract address
+  useEffect(() => {
+    if (proj?.address) {
+      fetchENSName();
+    }
+  }, [proj?.address]);
+
+  async function fetchENSName() {
+    try {
+      // 🚀 HACKATHON QUICKFIX: Read ENS name from localStorage
+      const address = proj!.address;
+      const existingMappings = JSON.parse(localStorage.getItem('ensNames') || '{}');
+      const ensName = existingMappings[address.toLowerCase()];
+
+      if (ensName) {
+        setENSName(ensName);
+        console.log("Found stored ENS name:", ensName, "for address:", address);
+      } else {
+        setENSName(null);
+        console.log("No stored ENS name found for address:", address);
+      }
+    } catch (error) {
+      console.warn("Failed to fetch stored ENS name:", error);
+      setENSName(null);
+    }
+  }
 
   // -------- derived UI values --------
   const soldTokens = useMemo(() => {
@@ -898,6 +943,11 @@ export default function PropertyDetailPage() {
                     <CardDescription className="flex items-center gap-1 mt-2 text-base">
                       <MapPin className="h-4 w-4" /> —
                     </CardDescription>
+                    {ENSName && (
+                      <CardDescription className="mt-2 text-sm font-medium text-primary">
+                        ENS: {ENSName}
+                      </CardDescription>
+                    )}
                     <CardDescription className="mt-2 text-xs break-all">
                       Project: {proj.address}
                     </CardDescription>

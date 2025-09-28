@@ -19,6 +19,12 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { ethers } from "ethers";
+import { normalize, namehash } from "viem/ens";
+import { createPublicClient } from "viem";
+import { sepolia } from "viem/chains";
+import { createWalletClient, http, custom } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { set } from "date-fns";
 
 // Extend Window interface to include ethereum
 declare global {
@@ -171,10 +177,14 @@ const PROJECT_FACTORY_ABI = [
 ];
 
 const PROJECT_FACTORY_ADDRESS = "0x165Ec032B5F1CDb9001C8c206e026082c1a1A8a7";
+// ENS contract addresses (Sepolia) - Updated with correct addresses
+const REVERSE_REGISTRAR_ADDRESS = "0xA0a1AbcDAe1a2a4A2EF8e9113Ff0e02DD81DC0C6";
+const PUBLIC_RESOLVER_ADDRESS = "0x42D63ae25990889E35F215bC95884039Ba354115";
 
 export default function ListAssetPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [ENSName, setENSName] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     tokenSymbol: "",
@@ -185,6 +195,7 @@ export default function ListAssetPage() {
     expReturn: "",
     minThreshold: "",
     timeoutDays: "",
+    ensName: "",
     description: "",
   });
   const { toast } = useToast();
@@ -369,6 +380,7 @@ export default function ListAssetPage() {
         signer
       );
 
+      // Note: You'll need to modify your contract to accept ENS name as parameter
       const tx = await factory.createProject(
         name,
         symbol,
@@ -377,6 +389,8 @@ export default function ListAssetPage() {
         exp_return_amount,
         min_threshold,
         timeout
+        // TODO: Add ensName parameter when contract is updated
+        // formData.ensName.trim()
       );
 
       toast({
@@ -416,6 +430,21 @@ export default function ListAssetPage() {
         duration: 9000,
       });
 
+      // 🚀 HACKATHON QUICKFIX: Store ENS name locally instead of on-chain
+      const ensName = formData.ensName.trim();
+      if (ensName && projectAddr) {
+        // Store the ENS name mapping in localStorage
+        const existingMappings = JSON.parse(localStorage.getItem('ensNames') || '{}');
+        existingMappings[projectAddr.toLowerCase()] = ensName;
+        localStorage.setItem('ensNames', JSON.stringify(existingMappings));
+
+        toast({
+          title: "ENS Name Saved!",
+          description: `${ensName} linked to project ${projectAddr.slice(0, 6)}...`,
+        });
+
+        console.log(`Saved ENS mapping: ${projectAddr} -> ${ensName}`);
+      }
       // Reset form
       setFormData({
         name: "",
@@ -427,6 +456,7 @@ export default function ListAssetPage() {
         expReturn: "",
         minThreshold: "",
         timeoutDays: "",
+        ensName: "",
         description: "",
       });
       setUploadedFile(null);
@@ -624,6 +654,20 @@ export default function ListAssetPage() {
                       onChange={handleInputChange}
                       readOnly
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ensName">Custom Name (optional)</Label>
+                    <Input
+                      id="ensName"
+                      name="ensName"
+                      type="text"
+                      placeholder="e.g., MyAwesome.Project"
+                      value={formData.ensName}
+                      onChange={handleInputChange}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Custom display name for your project (shown instead of address)
+                    </p>
                   </div>
                 </div>
 
