@@ -3,16 +3,15 @@ pragma solidity ^0.8.20;
 
 import "./Project.sol";
 
-/// Deploys new projects
+
 contract ProjectFactory {
-    address public compliance;
-    address public insurancePool;
+    address public immutable insurancePool;
     address[] public allProjects;
 
-    event ProjectCreated(address project, address promoter);
+    event ProjectCreated(address indexed project, address indexed promoter, address token);
 
-    constructor(address _compliance, address _insurancePool) {
-        compliance = _compliance;
+    constructor(address _insurancePool) {
+        require(_insurancePool != address(0), "Invalid pool");
         insurancePool = _insurancePool;
     }
 
@@ -24,17 +23,25 @@ contract ProjectFactory {
         uint256 exp_return_amount,
         uint256 min_threshold,
         uint256 timeout
-    ) external returns (address) {
-        Project project = new Project(name, symbol, compliance, msg.sender, insurancePool, area, req_amount, exp_return_amount, min_threshold,timeout);
+    ) external returns (address projectAddr, address tokenAddr) {
+        Project project = new Project(
+            name,
+            symbol,
+            msg.sender,       // promoter
+            insurancePool,
+            area,
+            req_amount,
+            exp_return_amount,
+            min_threshold,
+            timeout
+        );
         allProjects.push(address(project));
-        project.shareToken().approve(address(project), project.area());
-        // insurancePool.registerProject(address(project));
-        emit ProjectCreated(address(project), msg.sender);
-        return address(project);
+
+        emit ProjectCreated(address(project), msg.sender, project.tokenAddress());
+        return (address(project), project.tokenAddress());
     }
 
     function getAllProjects() external view returns (address[] memory) {
         return allProjects;
     }
 }
-
