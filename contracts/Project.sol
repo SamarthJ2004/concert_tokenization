@@ -4,31 +4,39 @@ pragma solidity ^0.8.20;
 import "./TokenContract.sol";
 import "./InsurancePool.sol";
 
-/// Project = tokenized event
+
 contract Project {
-    ComplianceToken public shareToken;
-    InsurancePool public insurancePool;
+  
+    uint256 private constant DECIMALS = 1e18;
+    uint256 public constant INSURANCE_BP = 500;
 
-    address public promoter;
-    bool public fundingClosed;
-    bool public revenueDistributed;
 
-    uint256 public totalRaised;
-    uint256 public area;
-    uint256 public req_amount;
-    uint256 public exp_return_amount;
-    uint256 public min_threshold;
-    uint256 public timeout;
+    ComplianceToken public immutable shareToken;
+    InsurancePool public immutable insurancePool;
 
-    uint256 public constant INSURANCE_BP = 500; // 5% fee
+    address public immutable promoter;
 
-    mapping(address => uint256) public investorBalances;
-    address[] public investors;
+    uint256 public immutable area;              
+    uint256 public immutable req_amount;      
+    uint256 public immutable exp_return_amount; 
+    uint256 public immutable min_threshold;     
+    uint256 public immutable timeout;           
 
+    uint256 public immutable pricePerWholeToken; 
+  
+    uint256 public soldWholeTokens; 
+    uint256 public totalRaised;     
+    mapping(address => uint256) public investorWholeTokens; 
+
+ 
+    event TokensPurchased(address indexed buyer, uint256 wholeTokens, uint256 paidWei, uint256 insuranceCut);
+    event InsuranceClaimed(uint256 payoutWei);
+    event RevenueWithdrawn(address indexed to, uint256 amountWei);
+
+  
     constructor(
         string memory _name,
         string memory _symbol,
-        address compliance,
         address _promoter,
         address _insurancePool,
         uint256 _area,
@@ -37,93 +45,116 @@ contract Project {
         uint256 _min_threshold,
         uint256 _timeout
     ) {
+        require(_promoter != address(0), "Invalid promoter");
+        require(_insurancePool != address(0), "Invalid insurance pool");
+        require(_area > 0, "Area must be > 0");
+        require(_req_amount > 0, "Req amount must be > 0");
+        require(_req_amount % _area == 0, "req_amount must divide area exactly");
+
         promoter = _promoter;
-        shareToken = new ComplianceToken(_name, _symbol, compliance);
         insurancePool = InsurancePool(payable(_insurancePool));
+
         area = _area;
         req_amount = _req_amount;
         exp_return_amount = _exp_return_amount;
         min_threshold = _min_threshold;
         timeout = _timeout;
 
-        // promoter gets all tokens initially
-        shareToken.mint(promoter, area);
+        pricePerWholeToken = _req_amount / _area;
+
+      
+        shareToken = new ComplianceToken(_name, _symbol);
+
+       
+        shareToken.mint(address(this), _area * DECIMALS);
     }
 
-    modifier onlyPromoter() {
-        require(msg.sender == promoter, "Not promoter");
-        _;
+  
+    function totalTokens() public view returns (uint256) {
+        return area;
     }
 
-    // investors send ETH
-    function invest() external payable {
-        require(!fundingClosed, "Funding closed");
-        require(msg.value > 0, "Zero investment");
+ 
+    function soldTokens() public view returns (uint256) {
+        return soldWholeTokens;
+    }
 
-        uint256 pricePerToken = req_amount / area;
-        uint256 tokensToSend = msg.value / pricePerToken;
-        require(tokensToSend > 0, "Not enough for 1 token");
+    function availableTokens() public view returns (uint256) {
+   
+        uint256 bal = shareToken.balanceOf(address(this));
+        return bal / DECIMALS;
+    }
 
+
+    function tokenAddress() external view returns (address) {
+        return address(shareToken);
+    }
+
+
+    function buyTokens(uint256 wholeTokens) external payable {
+        require(wholeTokens > 0, "Zero token amount");
+        require(availableTokens() >= wholeTokens, "Not enough available");
+
+        uint256 cost = wholeTokens * pricePerWholeToken;
+        require(msg.value == cost, "Incorrect ETH sent");
+
+  
+        soldWholeTokens += wholeTokens;
         totalRaised += msg.value;
-        if (investorBalances[msg.sender] == 0) {
-            investors.push(msg.sender);
-        }
-        investorBalances[msg.sender] += msg.value;
+        investorWholeTokens[msg.sender] += wholeTokens;
 
-        // transfer tokens from promoter to investor
-        shareToken.transferFrom(promoter, msg.sender, tokensToSend);
+
+        shareToken.transfer(msg.sender, wholeTokens * DECIMALS);
+
+
+        uint256 insuranceCut = (msg.value * INSURANCE_BP) / 10000;
+        if (insuranceCut > 0) {
+            insurancePool.contribute{value: insuranceCut}(address(this));
+        }
+        uint256 promoterProceeds = msg.value - insuranceCut;
+        payable(promoter).transfer(promoterProceeds);
+
+        emit TokensPurchased(msg.sender, wholeTokens, msg.value, insuranceCut);
     }
 
-    // promoter closes fundraising and contributes to pool
-    function closeFunding() external onlyPromoter {
-        require(!fundingClosed, "Already closed");
-        fundingClosed = true;
 
-        uint256 insuranceCut = (totalRaised * INSURANCE_BP) / 10000;
+    function buyWithETH() external payable {
+        require(msg.value > 0, "Zero ETH");
+        require(msg.value % pricePerWholeToken == 0, "ETH not multiple of price");
+        uint256 wholeTokens = msg.value / pricePerWholeToken;
+        require(availableTokens() >= wholeTokens, "Not enough available");
 
-        // contribute to insurance pool
-        insurancePool.contribute{value: insuranceCut}(address(this));
+        soldWholeTokens += wholeTokens;
+        totalRaised += msg.value;
+        investorWholeTokens[msg.sender] += wholeTokens;
 
-        // promoter withdraws remaining
-        uint256 promoterAmount = totalRaised - insuranceCut;
-        payable(promoter).transfer(promoterAmount);
+        shareToken.transfer(msg.sender, wholeTokens * DECIMALS);
+
+        uint256 insuranceCut = (msg.value * INSURANCE_BP) / 10000;
+        if (insuranceCut > 0) {
+            insurancePool.contribute{value: insuranceCut}(address(this));
+        }
+        uint256 promoterProceeds = msg.value - insuranceCut;
+        payable(promoter).transfer(promoterProceeds);
+
+        emit TokensPurchased(msg.sender, wholeTokens, msg.value, insuranceCut);
     }
 
-    // simulate revenue distribution in PROFIT case
-    function distributeProfit(uint256 revenue) external onlyPromoter {
-        require(fundingClosed, "Funding not closed");
-        require(!revenueDistributed, "Already distributed");
-        revenueDistributed = true;
 
-        // distribute based on tokens held
-        for (uint256 i = 0; i < investors.length; i++) {
-            address inv = investors[i];
-            uint256 balance = shareToken.balanceOf(inv);
-            if (balance > 0) {
-                uint256 share = (revenue * balance) / area;
-                payable(inv).transfer(share);
-            }
-        }
+
+
+    function claimInsurance(uint256 amountWei) external returns (uint256) {
+        require(msg.sender == promoter, "Only promoter");
+        uint256 payout = insurancePool.claim(address(this), amountWei);
+        emit InsuranceClaimed(payout);
+        return payout;
     }
 
-    // simulate LOSS case: claim insurance to cover part of principal
-    function distributeLoss(uint256 lossAmount) external onlyPromoter {
-        require(fundingClosed, "Funding not closed");
-        require(!revenueDistributed, "Already distributed");
-        revenueDistributed = true;
-
-        // claim from pool (say promoter requests 50% of loss)
-        uint256 payout = insurancePool.claim(address(this), lossAmount);
-
-        // distribute insurance payout to investors pro-rata by invested amount
-        for (uint256 i = 0; i < investors.length; i++) {
-            address inv = investors[i];
-            uint256 invested = investorBalances[inv];
-            if (invested > 0) {
-                uint256 share = (payout * invested) / totalRaised;
-                payable(inv).transfer(share);
-            }
-        }
+  
+    function withdrawRevenue(uint256 amountWei) external {
+        require(msg.sender == promoter, "Only promoter");
+        require(amountWei <= address(this).balance, "Insufficient balance");
+        payable(promoter).transfer(amountWei);
+        emit RevenueWithdrawn(promoter, amountWei);
     }
 }
-
